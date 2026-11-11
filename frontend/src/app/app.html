@@ -1,0 +1,56 @@
+<si-application-header>
+  <si-header-brand>
+    <si-header-logo class="d-none d-md-flex"></si-header-logo>
+    <h1 class="application-name">{{ title }}</h1>
+  </si-header-brand>
+
+  <si-header-actions>
+    <button
+      si-header-account-item
+      type="button"
+      name="Team lead"
+      [siHeaderDropdownTriggerFor]="account"
+    ></button>
+  </si-header-actions>
+</si-application-header>
+
+<ng-template #account>
+  <si-header-dropdown>
+    <button si-header-dropdown-item type="button" icon="element-user">Profile</button>
+    <button si-header-dropdown-item type="button" icon="element-logout">Sign out</button>
+  </si-header-dropdown>
+</ng-template>
+
+<main class="m-8 d-flex flex-column gap-8">
+  <si-inline-notification
+    severity="info"
+    heading="Scaffolding milestone"
+    message="Employee import, overview, skill assignment and search arrive in the following milestones."
+  />
+
+  <si-card heading="Employees" subHeading="Imported from a CSV upload">
+    <div body class="p-8">
+      <si-empty-state
+        icon="element-user-group"
+        heading="No employees yet"
+        content="Importing a CSV of employees is the next milestone."
+      />
+    </div>
+  </si-card>
+
+  <si-card heading="Proficiency levels" subHeading="The scale skills are graded on">
+    <div body class="d-flex flex-wrap gap-4 p-8">
+      @for (level of proficiencyLevels; track level.label) {
+        <si-badge [type]="level.badge">{{ level.label }}</si-badge>
+      }
+    </div>
+  </si-card>
+
+  <si-card heading="Button variants" subHeading="Official Element documentation example, verbatim">
+    <div body>
+      <app-button-showcase />
+    </div>
+  </si-card>
+
+  <router-outlet />
+</main>

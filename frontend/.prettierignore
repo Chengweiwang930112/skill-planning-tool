@@ -1,0 +1,8 @@
+# Prettier only reads a .gitignore next to its working directory, and this
+# project keeps a single ignore file at the repository root, so build output
+# has to be listed again here.
+dist/
+coverage/
+.angular/
+node_modules/
+package-lock.json

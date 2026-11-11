@@ -1,0 +1,8 @@
+# Normalise text files to LF inside the repository and in the working tree, so
+# that Windows developers, Linux CI and the container image all see the same
+# bytes (and no false diffs in review).
+* text=auto eol=lf
+
+# Generated lockfiles: collapsed by default in review tools, still committed.
+uv.lock linguist-generated=true
+frontend/package-lock.json linguist-generated=true

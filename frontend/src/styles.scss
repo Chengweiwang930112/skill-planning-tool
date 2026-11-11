@@ -1,0 +1,15 @@
+@charset "UTF-8";
+
+// The public `element` theme. The Siemens brand theme (Siemens Sans, brand
+// colours) lives in the internal @simpl/brand package, which is not available
+// on the public registry.
+@use '@siemens/element-theme/src/theme' with (
+  $element-theme-default: 'element',
+  $element-themes: ('element')
+);
+
+// CDK overlay z-indexes and a11y helpers that Element's dialogs, dropdowns and
+// tooltips depend on.
+@use '@siemens/element-ng/element-ng';
+
+@use '@siemens/element-icons/dist/style/siemens-element-icons';

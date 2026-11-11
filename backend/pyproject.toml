@@ -1,0 +1,77 @@
+[project]
+name = "skill-planning-backend"
+version = "0.1.0"
+description = "Backend API for the Staff & Skill Planning Tool"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "pydantic-settings>=2.7",
+    "uvicorn[standard]>=0.34",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28",
+    "mypy>=1.14",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.25",
+    "pytest-cov>=6.0",
+    "ruff>=0.9",
+]
+
+# The backend is an application, not a library: nothing imports it, so there is
+# no reason to build and install a wheel. `pythonpath` below makes `app`
+# importable for pytest, and the container image simply copies the source tree.
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = """
+    --strict-markers
+    --strict-config
+    --cov=app
+    --cov-report=term-missing
+    --cov-fail-under=80
+"""
+# Every test coroutine is run by pytest-asyncio without needing a marker.
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.coverage.run]
+branch = true
+source = ["app"]
+
+[tool.coverage.report]
+exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+# Project root, so that `app` and `tests` are sorted as first-party imports.
+src = ["."]
+
+[tool.ruff.lint]
+select = [
+    "B",   # flake8-bugbear: likely bugs rather than style
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort: deterministic import order
+    "N",   # pep8-naming
+    "RUF", # ruff-specific rules
+    "SIM", # flake8-simplify
+    "UP",  # pyupgrade: keep up with the minimum Python version
+    "W",   # pycodestyle warnings
+]
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.mypy]
+python_version = "3.12"
+files = ["app", "tests"]
+strict = true
+warn_unreachable = true
+plugins = ["pydantic.mypy"]
