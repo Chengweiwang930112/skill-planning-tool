@@ -1,5 +1,5 @@
-from datetime import date, datetime
-from enum import IntEnum
+from datetime import UTC, date, datetime
+from enum import IntEnum, StrEnum
 from typing import Any
 
 from sqlalchemy import (
@@ -10,8 +10,10 @@ from sqlalchemy import (
     Index,
     MetaData,
     SmallInteger,
+    String,
     func,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import TypeDecorator
 
@@ -21,6 +23,12 @@ class ProficiencyLevel(IntEnum):
     INTERMEDIATE = 2
     ADVANCED = 3
     EXPERT = 4
+
+
+class ImportStatus(StrEnum):
+    SUCCEEDED = "succeeded"
+    PARTIALLY_SUCCEEDED = "partially_succeeded"
+    FAILED = "failed"
 
 
 # Stored as an integer rather than a native Postgres enum, so that "at least
@@ -103,3 +111,32 @@ class EmployeeSkill(Base):
 
     employee: Mapped[Employee] = relationship(back_populates="skills")
     skill: Mapped[Skill] = relationship(lazy="joined")
+
+
+class EmployeeImport(Base):
+    __tablename__ = "employee_import"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('succeeded', 'partially_succeeded', 'failed')", name="status_values"
+        ),
+        CheckConstraint(
+            "rows_succeeded = rows_created + rows_updated + rows_unchanged",
+            name="succeeded_breakdown",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    filename: Mapped[str]
+    file_sha256: Mapped[str] = mapped_column(String(64))
+    status: Mapped[ImportStatus] = mapped_column(String)
+    rows_succeeded: Mapped[int]
+    rows_failed: Mapped[int]
+    rows_created: Mapped[int]
+    rows_updated: Mapped[int]
+    rows_unchanged: Mapped[int]
+    error: Mapped[str | None]
+    row_errors: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
+    # Set in Python so the value is known right after the insert, without a refresh.
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), server_default=func.now()
+    )

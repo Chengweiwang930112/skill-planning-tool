@@ -4,8 +4,8 @@ An internal tool for team leads: import employees from a CSV, keep track of
 their skills and proficiency levels, and answer questions such as *"who knows
 Kubernetes at an advanced level?"* without asking around in chat.
 
-> **Status: milestone M2 — employee read API.** The toolchain, quality gates,
-> the database schema and the employee read API are in place; the features are built in
+> **Status: milestone M3 — CSV import.** The toolchain, quality gates, the
+> database schema, the employee read API and the CSV import are in place; the features are built in
 > the milestones listed under [Roadmap](#roadmap). Each milestone is a
 > self-contained commit with its own tests.
 
@@ -26,6 +26,7 @@ Kubernetes at an advanced level?"* without asking around in chat.
 │   └── migrations/   Alembic migrations
 ├── frontend/         Angular application (npm project)
 ├── docker/postgres/  database init script (creates the test database)
+├── samples/          CSV files to try the import with
 ├── scripts/          dev.ps1 / dev.sh behind the Makefile
 └── docker-compose.yml
 ```
@@ -103,6 +104,46 @@ cd frontend
 npm ci                  # install from package-lock.json
 npm start               # http://localhost:4200
 ```
+
+## Importing employees
+
+`POST /api/v1/imports` takes a CSV file with a header row:
+
+| Column            | Required | Notes                                         |
+| ----------------- | -------- | --------------------------------------------- |
+| `employee_number` | yes      | identifies the employee across imports        |
+| `first_name`      | yes      |                                               |
+| `last_name`       | yes      |                                               |
+| `email`           | yes      | unique, stored in lower case                  |
+| `department`      | no       |                                               |
+| `job_title`       | no       |                                               |
+| `location`        | no       |                                               |
+| `hire_date`       | no       | `YYYY-MM-DD` or `DD.MM.YYYY`                  |
+
+Column names are matched ignoring case and spaces (`Employee Number` works).
+Files may be comma, semicolon or tab separated and UTF-8 or Windows-1252
+encoded, which covers what Excel exports in German and English locales.
+
+- **Importing again is safe.** Rows are matched by `employee_number`: new ones
+  are created, changed ones updated, identical ones counted as unchanged.
+- **Valid rows are imported even when others fail.** Each failed row is
+  reported with its line number, column and reason: missing or invalid values,
+  a duplicate employee number or email within the file, or an email that
+  belongs to another employee.
+- **Every upload is recorded** in `employee_import` with its status, the number
+  of succeeded and failed rows, the row errors and the file's SHA-256, including
+  files rejected as a whole (missing columns, no data rows, unreadable
+  encoding). `GET /api/v1/imports` lists them.
+- Imports run one at a time (a Postgres advisory lock), files are limited to
+  5 MB and 10,000 rows.
+
+The files in `samples/` cover these cases:
+
+| File                         | Shows                                                        |
+| ---------------------------- | ------------------------------------------------------------ |
+| `employees.csv`              | a clean file; against the demo data: 2 created, 2 updated, 8 unchanged |
+| `employees-excel-de.csv`     | a German Excel export: Windows-1252, `;`, CRLF, `DD.MM.YYYY` |
+| `employees-with-errors.csv`  | one example of each row error next to valid rows             |
 
 ## Quality gates
 

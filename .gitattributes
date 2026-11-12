@@ -6,3 +6,6 @@
 # Generated lockfiles: collapsed by default in review tools, still committed.
 uv.lock linguist-generated=true
 frontend/package-lock.json linguist-generated=true
+
+# Byte-exact copy of an Excel export (Windows-1252, CRLF): must not be normalised.
+samples/employees-excel-de.csv -text

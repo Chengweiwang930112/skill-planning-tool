@@ -1,0 +1,13 @@
+employee_number,first_name,last_name,email,department,job_title,location,hire_date
+E-1001,Anna,Schmidt,anna.schmidt@example.com,Digital Industries,Senior Software Engineer,Munich,2019-04-01
+E-1002,Lukas,Müller,lukas.mueller@example.com,Digital Industries,Senior Software Engineer,Munich,2021-09-15
+E-1003,Mia,Weber,mia.weber@example.com,Smart Infrastructure,Frontend Developer,Zug,2020-01-06
+E-1004,Jonas,Fischer,jonas.fischer@example.com,Smart Infrastructure,DevOps Engineer,Zug,2018-06-01
+E-1005,Lea,Wagner,lea.wagner@example.com,Mobility,Cloud Architect,Berlin,2016-03-14
+E-1006,Felix,Becker,felix.becker@example.com,Mobility,Backend Developer,Berlin,2022-02-01
+E-1007,Sophie,Hoffmann,sophie.hoffmann@example.com,Healthineers,Full-Stack Developer,Erlangen,2023-05-02
+E-1008,Noah,Schulz,noah.schulz@example.com,Healthineers,Data Engineer,Erlangen,2017-11-20
+E-1009,Emma,Koch,emma.koch@example.com,Digital Industries,QA Engineer,Nuremberg,2024-01-08
+E-1010,Paul,Richter,paul.richter@example.com,Smart Infrastructure,Working Student,Munich,2025-10-01
+E-1011,Clara,Neumann,clara.neumann@example.com,Mobility,Product Owner,Berlin,2022-07-01
+E-1012,Ben,Schwarz,ben.schwarz@example.com,Healthineers,"Security Engineer, Cloud",Erlangen,2021-03-15

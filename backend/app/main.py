@@ -7,11 +7,13 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app import __version__
 from app.api.employees import router as employees_router
 from app.api.health import router as health_router
+from app.api.imports import router as imports_router
 from app.core.config import Settings, get_settings
 from app.core.errors import register_error_handlers
 
 OPENAPI_TAGS = [
     {"name": "employees", "description": "Employees and the skills assigned to them."},
+    {"name": "imports", "description": "Upload employees as CSV and review past imports."},
     {"name": "infrastructure", "description": "Health probes for the load balancer."},
 ]
 
@@ -39,6 +41,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
     register_error_handlers(app)
     app.include_router(employees_router, prefix=settings.api_v1_prefix)
+    app.include_router(imports_router, prefix=settings.api_v1_prefix)
     app.include_router(health_router)
 
     return app

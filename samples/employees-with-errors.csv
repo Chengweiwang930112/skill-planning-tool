@@ -1,0 +1,10 @@
+employee_number,first_name,last_name,email,department,job_title,location,hire_date
+E-3001,Hanna,Vogel,hanna.vogel@example.com,Mobility,Software Engineer,Berlin,2022-04-01
+E-3002,,Krüger,max.krueger@example.com,Mobility,Software Engineer,Berlin,2022-04-01
+E-3003,Tim,Braun,tim.braun-at-example.com,Mobility,Tester,Berlin,
+E-3004,Lena,Wolf,lena.wolf@example.com,Healthineers,Analyst,Erlangen,2023-13-01
+E-3001,Hanna,Vogel,hanna.vogel@example.com,Mobility,Software Engineer,Berlin,2022-04-01
+E-3005,Jan,Zimmer,hanna.vogel@example.com,Mobility,Intern,Berlin,
+E-3006,Anna,Schmidt,anna.schmidt@example.com,Digital Industries,Engineer,Munich,
+E-3007,Ida,Hartmann,ida.hartmann@example.com,Mobility,Designer,Berlin,2020-01-01,extra
+E-3008,Erik,Lange,erik.lange@example.com,Smart Infrastructure,Data Scientist,Zug,2024-06-01
