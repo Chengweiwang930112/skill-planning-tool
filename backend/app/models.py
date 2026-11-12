@@ -66,7 +66,10 @@ class Employee(Base):
     )
 
     skills: Mapped[list["EmployeeSkill"]] = relationship(
-        back_populates="employee", cascade="all, delete-orphan", passive_deletes=True
+        back_populates="employee",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by=lambda: (EmployeeSkill.level.desc(), EmployeeSkill.skill_id),
     )
 
 

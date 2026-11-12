@@ -7,10 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models import Employee, EmployeeSkill, ProficiencyLevel, Skill
-
-
-def make_employee(number: str = "E-1001", email: str = "anna.schmidt@example.com") -> Employee:
-    return Employee(employee_number=number, first_name="Anna", last_name="Schmidt", email=email)
+from tests.factories import make_employee
 
 
 def test_migrations_match_the_models(alembic_config: Config, migrated_database: None) -> None:
@@ -47,13 +44,13 @@ async def test_assigned_skill_round_trips_with_its_level(session: AsyncSession) 
 @pytest.mark.parametrize(
     "duplicate",
     [
-        make_employee(number="E-1001", email="someone.else@example.com"),
-        make_employee(number="E-2002", email="anna.schmidt@example.com"),
+        make_employee(employee_number="E-1001"),
+        make_employee(email="anna.schmidt@example.com"),
     ],
     ids=["employee_number", "email"],
 )
 async def test_employee_identifiers_are_unique(session: AsyncSession, duplicate: Employee) -> None:
-    session.add(make_employee())
+    session.add(make_employee(employee_number="E-1001", email="anna.schmidt@example.com"))
     await session.flush()
 
     session.add(duplicate)

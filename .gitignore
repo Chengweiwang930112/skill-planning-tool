@@ -25,6 +25,9 @@ node_modules/
 *.tsbuildinfo
 *.log
 
+# --- Logs of `make start` ---
+/.run/
+
 # --- Local configuration and secrets ---
 # Lockfiles (uv.lock, package-lock.json) are deliberately *not* ignored:
 # reproducible installs in CI and in the container images depend on them.

@@ -4,8 +4,8 @@ An internal tool for team leads: import employees from a CSV, keep track of
 their skills and proficiency levels, and answer questions such as *"who knows
 Kubernetes at an advanced level?"* without asking around in chat.
 
-> **Status: milestone M1 — domain model.** The toolchain, quality gates, the
-> database schema and its migrations are in place; the features are built in
+> **Status: milestone M2 — employee read API.** The toolchain, quality gates,
+> the database schema and the employee read API are in place; the features are built in
 > the milestones listed under [Roadmap](#roadmap). Each milestone is a
 > self-contained commit with its own tests.
 
@@ -26,6 +26,7 @@ Kubernetes at an advanced level?"* without asking around in chat.
 │   └── migrations/   Alembic migrations
 ├── frontend/         Angular application (npm project)
 ├── docker/postgres/  database init script (creates the test database)
+├── scripts/          dev.ps1 / dev.sh behind the Makefile
 └── docker-compose.yml
 ```
 
@@ -42,6 +43,23 @@ are shipped as separate container images.
 
 ## Quick start
 
+### Everything at once
+
+```bash
+make start     # database, migrations, then backend and frontend in the background
+make stop      # stop backend, frontend and the containers (data is kept)
+make restart
+make clean     # stop, then delete containers, volumes (database data) and logs
+```
+
+The targets work the same from cmd, PowerShell and bash. They call
+`scripts/dev.ps1` on Windows and `scripts/dev.sh` on Linux and macOS, which can
+also be run directly, e.g. `powershell -File scripts\dev.ps1 start`.
+
+Logs go to `.run/backend.log` and `.run/frontend.log`. The servers are stopped
+by the port they listen on (8000, 4200), so `make stop` also cleans up servers
+started by hand. The steps below do the same thing one at a time.
+
 ### Database
 
 ```bash
@@ -57,8 +75,14 @@ for the test suite, which migrates it from scratch on every run.
 cd backend
 uv sync                               # create .venv from uv.lock
 uv run alembic upgrade head           # apply migrations
+uv run python -m scripts.seed         # optional: fictional demo data (empty database only)
 uv run uvicorn app.main:app --reload  # http://localhost:8000/docs
 ```
+
+The API is documented with OpenAPI. Swagger UI at `/docs` lists every endpoint
+with its parameters, response schemas and error responses, and **Try it out**
+sends real requests. Errors use [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457)
+problem details (`application/problem+json`).
 
 New migration after a model change:
 `uv run alembic revision --autogenerate -m "<what changed>"`, then review the

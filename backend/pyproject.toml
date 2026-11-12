@@ -77,7 +77,7 @@ docstring-code-format = true
 
 [tool.mypy]
 python_version = "3.12"
-files = ["app", "tests"]
+files = ["app", "scripts", "tests"]
 strict = true
 warn_unreachable = true
 plugins = ["pydantic.mypy"]
