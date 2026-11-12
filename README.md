@@ -4,10 +4,10 @@ An internal tool for team leads: import employees from a CSV, keep track of
 their skills and proficiency levels, and answer questions such as *"who knows
 Kubernetes at an advanced level?"* without asking around in chat.
 
-> **Status: milestone M0 — scaffolding.** The toolchain, quality gates and
-> application skeletons are in place; the features are built in the milestones
-> listed under [Roadmap](#roadmap). Each milestone is a self-contained commit
-> with its own tests.
+> **Status: milestone M1 — domain model.** The toolchain, quality gates, the
+> database schema and its migrations are in place; the features are built in
+> the milestones listed under [Roadmap](#roadmap). Each milestone is a
+> self-contained commit with its own tests.
 
 ## Tech stack
 
@@ -21,8 +21,12 @@ Kubernetes at an advanced level?"* without asking around in chat.
 
 ```
 .
-├── backend/     FastAPI application (uv project)
-└── frontend/    Angular application (npm project)
+├── backend/          FastAPI application (uv project)
+│   ├── app/          application code
+│   └── migrations/   Alembic migrations
+├── frontend/         Angular application (npm project)
+├── docker/postgres/  database init script (creates the test database)
+└── docker-compose.yml
 ```
 
 One repository rather than two: the backend contract and the frontend that
@@ -34,17 +38,31 @@ are shipped as separate container images.
 
 - [uv](https://docs.astral.sh/uv/) (Python toolchain and dependency manager)
 - Node.js 22+ and npm 11+
-- Docker (from milestone M1 onwards, for PostgreSQL)
+- Docker (for PostgreSQL)
 
 ## Quick start
+
+### Database
+
+```bash
+docker compose up -d --wait db   # PostgreSQL 17 on localhost:5432
+```
+
+This creates two databases: `skills` for the application and `skills_test`
+for the test suite, which migrates it from scratch on every run.
 
 ### Backend
 
 ```bash
 cd backend
-uv sync                              # create .venv from uv.lock
+uv sync                               # create .venv from uv.lock
+uv run alembic upgrade head           # apply migrations
 uv run uvicorn app.main:app --reload  # http://localhost:8000/docs
 ```
+
+New migration after a model change:
+`uv run alembic revision --autogenerate -m "<what changed>"`, then review the
+generated file before applying it.
 
 Configuration comes from the environment; every variable is prefixed with
 `APP_` and documented in `backend/app/core/config.py`. Create `backend/.env`
@@ -74,7 +92,8 @@ pipeline.
 | Types            | `uv run mypy`           | part of `npm run build` |
 | Tests + coverage | `uv run pytest`         | `npm run test:ci`     |
 
-Both suites fail below 80% coverage.
+Both suites fail below 80% coverage. The backend tests need the database
+from `docker compose up -d db`.
 
 ## Roadmap
 

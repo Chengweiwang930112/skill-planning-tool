@@ -13,6 +13,27 @@ async def test_healthz_reports_ok(client: AsyncClient) -> None:
     assert response.json() == {"status": "ok", "version": __version__}
 
 
+async def test_readyz_reports_ok_when_the_database_answers(client: AsyncClient) -> None:
+    response = await client.get("/readyz")
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == {"status": "ok"}
+
+
+async def test_readyz_reports_unavailable_without_a_database() -> None:
+    app = create_app(
+        Settings(environment="test", database_url="postgresql+asyncpg://x:x@127.0.0.1:1/none")
+    )
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://testserver"
+    ) as client:
+        response = await client.get("/readyz")
+
+    assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    assert response.json() == {"status": "unavailable"}
+
+
 async def test_openapi_schema_is_served(client: AsyncClient) -> None:
     response = await client.get("/openapi.json")
 

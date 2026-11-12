@@ -18,14 +18,13 @@ class Settings(BaseSettings):
     app_name: str = "Staff & Skill Planning Tool"
     environment: Environment = "local"
     api_v1_prefix: str = "/api/v1"
+    database_url: str = "postgresql+asyncpg://skills:skills@localhost:5432/skills"
 
     @property
     def docs_enabled(self) -> bool:
-
         return self.environment != "production"
 
 
 @lru_cache
 def get_settings() -> Settings:
-
     return Settings()
