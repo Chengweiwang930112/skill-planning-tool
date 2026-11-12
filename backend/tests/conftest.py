@@ -58,8 +58,10 @@ def settings() -> Settings:
 def app(settings: Settings, session: AsyncSession) -> FastAPI:
     app = create_app(settings)
 
-    async def override_session() -> AsyncSession:
-        return session
+    async def override_session() -> AsyncIterator[AsyncSession]:
+        yield session
+        # Every request gets a fresh session in production; forget what this one loaded.
+        session.expunge_all()
 
     app.dependency_overrides[get_session] = override_session
     return app

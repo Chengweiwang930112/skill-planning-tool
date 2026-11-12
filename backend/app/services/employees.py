@@ -1,10 +1,11 @@
 from collections.abc import Sequence
 
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import Select, delete, func, literal_column, or_, select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute, selectinload
 
-from app.models import Employee
+from app.models import Employee, EmployeeSkill, ProficiencyLevel
 from app.schemas import EmployeeQuery
 
 SORTABLE: dict[str, InstrumentedAttribute[object]] = {
@@ -53,3 +54,30 @@ async def list_employees(
 
 async def get_employee(session: AsyncSession, employee_id: int) -> Employee | None:
     return await session.get(Employee, employee_id, options=[selectinload(Employee.skills)])
+
+
+async def assign_skill(
+    session: AsyncSession, employee_id: int, skill_id: int, level: ProficiencyLevel
+) -> bool:
+    """Sets the employee's level for the skill; returns whether the assignment is new."""
+    # xmax is 0 only for a row this statement inserted, not for one it updated.
+    created = await session.scalar(
+        insert(EmployeeSkill)
+        .values(employee_id=employee_id, skill_id=skill_id, level=level)
+        .on_conflict_do_update(
+            index_elements=[EmployeeSkill.employee_id, EmployeeSkill.skill_id],
+            set_={"level": level, "updated_at": func.now()},
+        )
+        .returning(literal_column("xmax = 0"))
+    )
+    await session.commit()
+    return bool(created)
+
+
+async def remove_skill(session: AsyncSession, employee_id: int, skill_id: int) -> None:
+    await session.execute(
+        delete(EmployeeSkill).where(
+            EmployeeSkill.employee_id == employee_id, EmployeeSkill.skill_id == skill_id
+        )
+    )
+    await session.commit()

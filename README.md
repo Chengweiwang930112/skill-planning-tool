@@ -4,8 +4,8 @@ An internal tool for team leads: import employees from a CSV, keep track of
 their skills and proficiency levels, and answer questions such as *"who knows
 Kubernetes at an advanced level?"* without asking around in chat.
 
-> **Status: milestone M3 — CSV import.** The toolchain, quality gates, the
-> database schema, the employee read API and the CSV import are in place; the features are built in
+> **Status: milestone M4 — skills.** The toolchain, quality gates, the database
+> schema, the employee read API, the CSV import and skill assignment are in place; the features are built in
 > the milestones listed under [Roadmap](#roadmap). Each milestone is a
 > self-contained commit with its own tests.
 
@@ -57,7 +57,10 @@ The targets work the same from cmd, PowerShell and bash. They call
 `scripts/dev.ps1` on Windows and `scripts/dev.sh` on Linux and macOS, which can
 also be run directly, e.g. `powershell -File scripts\dev.ps1 start`.
 
-Logs go to `.run/backend.log` and `.run/frontend.log`. The servers are stopped
+Logs go to `.run/backend.log` and `.run/frontend.log`. The frontend reloads on
+changes; the backend does not (uvicorn's reloader cannot stop a detached worker
+on Windows), so run `make restart` after backend changes, or run
+`uv run uvicorn app.main:app --reload` in a terminal of its own instead. The servers are stopped
 by the port they listen on (8000, 4200), so `make stop` also cleans up servers
 started by hand. The steps below do the same thing one at a time.
 

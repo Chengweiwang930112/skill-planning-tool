@@ -41,7 +41,7 @@ start() {
   (cd backend && uv run alembic upgrade head)
   [ -d frontend/node_modules ] || (cd frontend && npm ci)
   mkdir -p "$RUN_DIR"
-  start_server backend backend 8000 uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+  start_server backend backend 8000 uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
   start_server frontend frontend 4200 npm start -- --host 127.0.0.1 --port 4200
   wait_server backend http://127.0.0.1:8000/readyz
   wait_server frontend http://127.0.0.1:4200

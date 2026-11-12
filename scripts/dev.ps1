@@ -12,7 +12,7 @@ $RunDir = Join-Path $Root '.run'
 # refused IPv6 connection takes Windows about two seconds before it tries IPv4.
 $Servers = @(
     @{ Name = 'backend'; Port = 8000; Url = 'http://127.0.0.1:8000/readyz'; Directory = 'backend'
-       CommandLine = 'uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000' },
+       CommandLine = 'uv run uvicorn app.main:app --host 127.0.0.1 --port 8000' },
     @{ Name = 'frontend'; Port = 4200; Url = 'http://127.0.0.1:4200'; Directory = 'frontend'
        CommandLine = 'npm start -- --host 127.0.0.1 --port 4200' }
 )

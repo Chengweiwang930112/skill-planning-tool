@@ -1,24 +1,38 @@
 from datetime import date, datetime
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import (
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     PlainSerializer,
+    StringConstraints,
     WithJsonSchema,
     computed_field,
 )
 
 from app.models import ImportStatus, ProficiencyLevel
 
+LEVEL_NAMES = [level.name.lower() for level in ProficiencyLevel]
+
+
+def _parse_level(value: Any) -> ProficiencyLevel:
+    if isinstance(value, ProficiencyLevel):
+        return value
+    if isinstance(value, str) and value.lower() in LEVEL_NAMES:
+        return ProficiencyLevel[value.upper()]
+    raise ValueError(f"must be one of {', '.join(LEVEL_NAMES)}")
+
+
 Level = Annotated[
     ProficiencyLevel,
+    BeforeValidator(_parse_level),
     PlainSerializer(lambda level: level.name.lower(), return_type=str),
     WithJsonSchema(
         {
             "type": "string",
-            "enum": [level.name.lower() for level in ProficiencyLevel],
+            "enum": LEVEL_NAMES,
             "description": "Ordered from lowest to highest.",
         }
     ),
@@ -54,6 +68,24 @@ class SkillRead(BaseModel):
     name: str = Field(examples=["Kubernetes"])
 
 
+SkillName = Annotated[
+    str,
+    StringConstraints(min_length=1, max_length=100),
+    BeforeValidator(lambda name: " ".join(name.split()) if isinstance(name, str) else name),
+    Field(examples=["Kubernetes"]),
+]
+
+
+class SkillCreate(BaseModel):
+    name: SkillName = Field(
+        description="Matched case-insensitively against existing skills; whitespace is collapsed."
+    )
+
+
+class SkillAssignmentWrite(BaseModel):
+    level: Level = Field(examples=["advanced"])
+
+
 class SkillAssignmentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -79,6 +111,12 @@ class EmployeeRead(BaseModel):
 class PageQuery(BaseModel):
     page: int = Field(1, ge=1, description="1-based page number.")
     page_size: int = Field(20, ge=1, le=100, description="Items per page (max 100).")
+
+
+class SkillQuery(PageQuery):
+    q: str | None = Field(
+        None, min_length=1, max_length=100, description="Case-insensitive part of the name."
+    )
 
 
 class EmployeeQuery(PageQuery):
