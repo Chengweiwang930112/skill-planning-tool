@@ -4,8 +4,8 @@ An internal tool for team leads: import employees from a CSV, keep track of
 their skills and proficiency levels, and answer questions such as *"who knows
 Kubernetes at an advanced level?"* without asking around in chat.
 
-> **Status: milestone M4 — skills.** The toolchain, quality gates, the database
-> schema, the employee read API, the CSV import and skill assignment are in place; the features are built in
+> **Status: milestone M5 — skill search; the backend is feature-complete.** The
+> employee API, CSV import, skill assignment and skill search are in place; the features are built in
 > the milestones listed under [Roadmap](#roadmap). Each milestone is a
 > self-contained commit with its own tests.
 
@@ -107,6 +107,24 @@ cd frontend
 npm ci                  # install from package-lock.json
 npm start               # http://localhost:4200
 ```
+
+## Searching by skill
+
+"Who knows Kubernetes at an advanced level?" is a filter on the employee list:
+
+```
+GET /api/v1/employees?skill=kubernetes:advanced
+```
+
+`name:level` matches employees with that skill at the level **or higher**, so
+`advanced` also finds experts; `name` alone matches any level. Repeat `skill`
+to require several skills at once, e.g.
+`?skill=kubernetes:advanced&skill=python:intermediate`. Skill names are matched
+ignoring case, a misspelt level is rejected rather than matching nobody, and
+the filter combines with `q`, `department`, sorting and paging.
+
+Levels are stored as integers (1 = beginner … 4 = expert), so "or higher" is a
+plain `level >= 3`, answered from the `(skill_id, level)` index.
 
 ## Importing employees
 

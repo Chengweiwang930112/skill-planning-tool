@@ -1,7 +1,8 @@
 from datetime import date, datetime
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, NamedTuple
 
 from pydantic import (
+    AfterValidator,
     BaseModel,
     BeforeValidator,
     ConfigDict,
@@ -23,6 +24,26 @@ def _parse_level(value: Any) -> ProficiencyLevel:
     if isinstance(value, str) and value.lower() in LEVEL_NAMES:
         return ProficiencyLevel[value.upper()]
     raise ValueError(f"must be one of {', '.join(LEVEL_NAMES)}")
+
+
+class SkillCriterion(NamedTuple):
+    name: str
+    min_level: ProficiencyLevel
+
+
+def parse_skill_criterion(value: str) -> SkillCriterion:
+    name, separator, level = value.rpartition(":")
+    if not separator:
+        name, level = value, ProficiencyLevel.BEGINNER.name
+    name = " ".join(name.split())
+    if not name:
+        raise ValueError("needs a skill name, e.g. kubernetes:advanced")
+    return SkillCriterion(name, _parse_level(level))
+
+
+def _check_skill_criterion(value: str) -> str:
+    parse_skill_criterion(value)
+    return value
 
 
 Level = Annotated[
@@ -130,9 +151,23 @@ class EmployeeQuery(PageQuery):
     department: str | None = Field(
         None, description="Exact department, case-insensitive.", examples=["Digital Industries"]
     )
+    skill: list[Annotated[str, AfterValidator(_check_skill_criterion)]] = Field(
+        default_factory=list,
+        max_length=10,
+        description=(
+            "`name:level` keeps employees who have the skill at that level **or higher**; "
+            "`name` alone accepts any level. Repeat the parameter to require several skills. "
+            "Skill names are matched ignoring case."
+        ),
+        examples=[["kubernetes:advanced", "python"]],
+    )
     sort: EmployeeSort = Field(
         "last_name", description="Field to sort by; prefix `-` for descending."
     )
+
+    @property
+    def skill_criteria(self) -> list[SkillCriterion]:
+        return [parse_skill_criterion(value) for value in self.skill]
 
 
 class RowErrorRead(BaseModel):

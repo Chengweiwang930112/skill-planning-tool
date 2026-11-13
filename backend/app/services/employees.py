@@ -5,7 +5,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute, selectinload
 
-from app.models import Employee, EmployeeSkill, ProficiencyLevel
+from app.models import Employee, EmployeeSkill, ProficiencyLevel, Skill
 from app.schemas import EmployeeQuery
 
 SORTABLE: dict[str, InstrumentedAttribute[object]] = {
@@ -32,6 +32,18 @@ def _filtered(query: EmployeeQuery) -> Select[Employee]:
         )
     if query.department:
         statement = statement.where(func.lower(Employee.department) == query.department.lower())
+    for criterion in query.skill_criteria:
+        # Served by the (skill_id, level) index on employee_skill.
+        statement = statement.where(
+            Employee.id.in_(
+                select(EmployeeSkill.employee_id)
+                .join(Skill)
+                .where(
+                    func.lower(Skill.name) == criterion.name.lower(),
+                    EmployeeSkill.level >= criterion.min_level,
+                )
+            )
+        )
     return statement
 
 
