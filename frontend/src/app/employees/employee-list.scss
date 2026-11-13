@@ -1,0 +1,21 @@
+.search {
+  flex: 1 1 20rem;
+  max-inline-size: 28rem;
+}
+
+.sort-button {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--element-focus-default);
+    outline-offset: 2px;
+  }
+}
+
+.reloading {
+  opacity: 0.6;
+}

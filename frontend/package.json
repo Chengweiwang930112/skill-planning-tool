@@ -13,7 +13,8 @@
     "test:ci": "ng test --no-watch",
     "lint": "ng lint",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "api:types": "uv run --directory ../backend python -m scripts.export_openapi > src/app/api/openapi.json && openapi-typescript src/app/api/openapi.json -o src/app/api/schema.ts"
   },
   "dependencies": {
     "@angular/aria": "^22.2.7",
@@ -40,9 +41,15 @@
     "angular-eslint": "22.6.0",
     "eslint": "^10.12.0",
     "happy-dom": "^21.0.4",
+    "openapi-typescript": "^7.13.0",
     "prettier": "^3.8.1",
     "typescript": "~6.0.2",
     "typescript-eslint": "8.71.0",
     "vitest": "^5.0.0"
+  },
+  "overrides": {
+    "openapi-typescript": {
+      "typescript": "$typescript"
+    }
   }
 }

@@ -4,8 +4,8 @@ An internal tool for team leads: import employees from a CSV, keep track of
 their skills and proficiency levels, and answer questions such as *"who knows
 Kubernetes at an advanced level?"* without asking around in chat.
 
-> **Status: milestone M5 — skill search; the backend is feature-complete.** The
-> employee API, CSV import, skill assignment and skill search are in place; the features are built in
+> **Status: milestone M6 — frontend foundation.** The backend is feature-complete
+> and the frontend shows the employee overview; the features are built in
 > the milestones listed under [Roadmap](#roadmap). Each milestone is a
 > self-contained commit with its own tests.
 
@@ -105,8 +105,13 @@ APP_ENVIRONMENT=local
 ```bash
 cd frontend
 npm ci                  # install from package-lock.json
-npm start               # http://localhost:4200
+npm start               # http://localhost:4200, proxies /api to the backend on :8000
 ```
+
+The API types in `src/app/api/schema.ts` are generated from the backend's
+OpenAPI schema. After changing the API, regenerate them with
+`npm run api:types` (needs `uv`, not a running backend); a type error in the
+frontend then shows every place the change affects.
 
 ## Searching by skill
 
@@ -191,15 +196,47 @@ from `docker compose up -d db`.
 | M3        | CSV import: parsing, validation, idempotent upsert, import report   |
 | M4        | Skill catalogue and skill assignment                                |
 | M5        | Skill search with "at least this level" semantics                   |
-| M6–M9     | Frontend: shell, employee overview, import, skill assignment, search |
+| M6        | Frontend foundation and employee overview (details below)           |
+| M7        | Employee import page                                                |
+| M8        | Skill assignment                                                    |
+| M9        | Skill search page                                                   |
 | M10       | Container images and Docker Compose                                 |
 | M11       | CI/CD pipeline, architecture decision records, documentation        |
 
-The M0 landing page is a placeholder that doubles as a check on the design
-system setup: `frontend/src/app/button-showcase/` is the button example from the
-Siemens Element documentation, included verbatim (MIT) to confirm that the
-theme, the icon font and the CDK overlay styles are wired correctly. It is
-removed once the real views arrive in M6.
+### Frontend milestones
+
+**M6 — Foundation and employee overview**
+- Application shell: Element application header with navigation, routing with
+  lazily loaded pages.
+- API access: types generated from the backend's OpenAPI schema, `/api` proxied
+  to the backend by the dev server, errors shown from the problem details.
+- Employee overview: table of employees with their skills as level-coloured
+  badges, text search, sortable columns and pagination, all kept in the URL so
+  a view can be bookmarked and the back button works.
+- Loading, empty and error states.
+- Removes the M0 placeholder page, including the Element button showcase that
+  checked the design system setup.
+
+**M7 — Employee import**
+- Upload page with drag and drop (Element file uploader) for CSV files.
+- Import report: succeeded and failed counts, created / updated / unchanged
+  breakdown and the row errors as a table with line, column and reason.
+- Import history from `GET /imports`, each entry opening its report.
+- The employee overview shows newly imported employees without a reload.
+
+**M8 — Skill assignment**
+- Employee detail in a side panel, opened from the overview.
+- Add a skill with autocompletion from the catalogue, creating it if it does
+  not exist yet; choose or change its level; remove it.
+- Changes appear immediately and roll back with an error message if the
+  request fails.
+
+**M9 — Skill search**
+- Search page answering "who knows Kubernetes at an advanced level?": one or
+  more skill + minimum level criteria, picked from the catalogue.
+- Results table highlighting the matched skills, combined with the text search
+  and paging of the overview.
+- Criteria kept in the URL, so a search can be shared as a link.
 
 ## Non-goals
 

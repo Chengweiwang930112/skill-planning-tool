@@ -1,0 +1,1457 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Staff & Skill Planning Tool",
+    "summary": "Track employees, their skills and proficiency levels.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/employees": {
+      "get": {
+        "tags": [
+          "employees"
+        ],
+        "summary": "List employees",
+        "description": "Employees with their assigned skills, filtered, sorted and paginated.",
+        "operationId": "list_employees_api_v1_employees_get",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "1-based page number.",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "1-based page number."
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Items per page (max 100).",
+              "default": 20,
+              "title": "Page Size"
+            },
+            "description": "Items per page (max 100)."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Case-insensitive match on full name, email or employee number.",
+              "examples": [
+                "schmidt"
+              ],
+              "title": "Q"
+            },
+            "description": "Case-insensitive match on full name, email or employee number."
+          },
+          {
+            "name": "department",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Exact department, case-insensitive.",
+              "examples": [
+                "Digital Industries"
+              ],
+              "title": "Department"
+            },
+            "description": "Exact department, case-insensitive."
+          },
+          {
+            "name": "skill",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 10,
+              "description": "`name:level` keeps employees who have the skill at that level **or higher**; `name` alone accepts any level. Repeat the parameter to require several skills. Skill names are matched ignoring case.",
+              "examples": [
+                [
+                  "kubernetes:advanced",
+                  "python"
+                ]
+              ],
+              "title": "Skill"
+            },
+            "description": "`name:level` keeps employees who have the skill at that level **or higher**; `name` alone accepts any level. Repeat the parameter to require several skills. Skill names are matched ignoring case."
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "last_name",
+                "-last_name",
+                "first_name",
+                "-first_name",
+                "employee_number",
+                "-employee_number",
+                "department",
+                "-department",
+                "location",
+                "-location",
+                "hire_date",
+                "-hire_date"
+              ],
+              "type": "string",
+              "description": "Field to sort by; prefix `-` for descending.",
+              "default": "last_name",
+              "title": "Sort"
+            },
+            "description": "Field to sort by; prefix `-` for descending."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_EmployeeRead_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/employees/{employee_id}": {
+      "get": {
+        "tags": [
+          "employees"
+        ],
+        "summary": "Get an employee",
+        "operationId": "get_employee_api_v1_employees__employee_id__get",
+        "parameters": [
+          {
+            "name": "employee_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Employee Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmployeeRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Employee not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/employees/{employee_id}/skills/{skill_id}": {
+      "put": {
+        "tags": [
+          "employees"
+        ],
+        "summary": "Assign a skill or change its level",
+        "description": "Idempotent: 201 when the employee did not have the skill yet, 200 otherwise.",
+        "operationId": "assign_skill_api_v1_employees__employee_id__skills__skill_id__put",
+        "parameters": [
+          {
+            "name": "employee_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Employee Id"
+            }
+          },
+          {
+            "name": "skill_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Skill Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillAssignmentWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillAssignmentRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Level changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillAssignmentRead"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Employee or skill not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "employees"
+        ],
+        "summary": "Remove a skill from an employee",
+        "description": "Idempotent: removing a skill the employee does not have is not an error.",
+        "operationId": "remove_skill_api_v1_employees__employee_id__skills__skill_id__delete",
+        "parameters": [
+          {
+            "name": "employee_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Employee Id"
+            }
+          },
+          {
+            "name": "skill_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Skill Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Employee or skill not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/skills": {
+      "get": {
+        "tags": [
+          "skills"
+        ],
+        "summary": "List skills",
+        "description": "The skill catalogue, alphabetically; `q` narrows it down for autocompletion.",
+        "operationId": "list_skills_api_v1_skills_get",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "1-based page number.",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "1-based page number."
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Items per page (max 100).",
+              "default": 20,
+              "title": "Page Size"
+            },
+            "description": "Items per page (max 100)."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Case-insensitive part of the name.",
+              "title": "Q"
+            },
+            "description": "Case-insensitive part of the name."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SkillRead_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "skills"
+        ],
+        "summary": "Create a skill, or get the existing one",
+        "description": "Names are unique regardless of case: asking for `kubernetes` when `Kubernetes`\nexists returns the existing skill with 200 instead of creating a near-duplicate.",
+        "operationId": "create_skill_api_v1_skills_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "The skill already existed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillRead"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/imports": {
+      "post": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Import employees from a CSV file",
+        "description": "Creates or updates employees by `employee_number`, so importing a file again is safe.\n\nValid rows are imported even if other rows fail; every upload is recorded, including\nfiles that are rejected as a whole, and the response is that record.",
+        "operationId": "create_import_api_v1_imports_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_create_import_api_v1_imports_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "File larger than 5 MB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "List imports, newest first",
+        "operationId": "list_imports_api_v1_imports_get",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "1-based page number.",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "1-based page number."
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Items per page (max 100).",
+              "default": 20,
+              "title": "Page Size"
+            },
+            "description": "Items per page (max 100)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ImportSummary_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/imports/{import_id}": {
+      "get": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Get an import with its row errors",
+        "operationId": "get_import_api_v1_imports__import_id__get",
+        "parameters": [
+          {
+            "name": "import_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Import Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Import not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/healthz": {
+      "get": {
+        "tags": [
+          "infrastructure"
+        ],
+        "summary": "Liveness probe",
+        "operationId": "healthz_healthz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "tags": [
+          "infrastructure"
+        ],
+        "summary": "Readiness probe",
+        "operationId": "readyz_readyz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Body_create_import_api_v1_imports_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "description": "CSV with a header row. Required columns: employee_number, first_name, last_name, email;\noptional: department, job_title, location, hire_date. Comma, semicolon or tab separated; UTF-8 or\nWindows-1252; dates as YYYY-MM-DD or DD.MM.YYYY. At most 5 MB."
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_create_import_api_v1_imports_post"
+      },
+      "EmployeeRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "examples": [
+              1
+            ]
+          },
+          "employee_number": {
+            "type": "string",
+            "title": "Employee Number",
+            "examples": [
+              "E-1001"
+            ]
+          },
+          "first_name": {
+            "type": "string",
+            "title": "First Name",
+            "examples": [
+              "Anna"
+            ]
+          },
+          "last_name": {
+            "type": "string",
+            "title": "Last Name",
+            "examples": [
+              "Schmidt"
+            ]
+          },
+          "email": {
+            "type": "string",
+            "title": "Email",
+            "examples": [
+              "anna.schmidt@example.com"
+            ]
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department",
+            "examples": [
+              "Digital Industries"
+            ]
+          },
+          "job_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Title",
+            "examples": [
+              "Senior Software Engineer"
+            ]
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location",
+            "examples": [
+              "Munich"
+            ]
+          },
+          "hire_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hire Date",
+            "examples": [
+              "2019-04-01"
+            ]
+          },
+          "skills": {
+            "items": {
+              "$ref": "#/components/schemas/SkillAssignmentRead"
+            },
+            "type": "array",
+            "title": "Skills",
+            "description": "Strongest skills first."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "employee_number",
+          "first_name",
+          "last_name",
+          "email",
+          "department",
+          "job_title",
+          "location",
+          "hire_date",
+          "skills"
+        ],
+        "title": "EmployeeRead"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok",
+            "title": "Status"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "version"
+        ],
+        "title": "HealthResponse"
+      },
+      "ImportRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "examples": [
+              1
+            ]
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "examples": [
+              "employees.csv"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/ImportStatus",
+            "description": "`failed` when no row could be imported, including unreadable files."
+          },
+          "rows_succeeded": {
+            "type": "integer",
+            "title": "Rows Succeeded",
+            "description": "Created + updated + unchanged.",
+            "examples": [
+              11
+            ]
+          },
+          "rows_failed": {
+            "type": "integer",
+            "title": "Rows Failed",
+            "description": "Rows with at least one error.",
+            "examples": [
+              1
+            ]
+          },
+          "rows_created": {
+            "type": "integer",
+            "title": "Rows Created",
+            "examples": [
+              2
+            ]
+          },
+          "rows_updated": {
+            "type": "integer",
+            "title": "Rows Updated",
+            "examples": [
+              1
+            ]
+          },
+          "rows_unchanged": {
+            "type": "integer",
+            "title": "Rows Unchanged",
+            "description": "Rows identical to the stored employee, e.g. when a file is imported again.",
+            "examples": [
+              8
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "Why the whole file was rejected, if it was.",
+            "examples": [
+              null
+            ]
+          },
+          "file_sha256": {
+            "type": "string",
+            "title": "File Sha256"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "row_errors": {
+            "items": {
+              "$ref": "#/components/schemas/RowErrorRead"
+            },
+            "type": "array",
+            "title": "Row Errors",
+            "description": "Ordered by row."
+          },
+          "rows_total": {
+            "type": "integer",
+            "title": "Rows Total",
+            "readOnly": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "filename",
+          "status",
+          "rows_succeeded",
+          "rows_failed",
+          "rows_created",
+          "rows_updated",
+          "rows_unchanged",
+          "error",
+          "file_sha256",
+          "created_at",
+          "row_errors",
+          "rows_total"
+        ],
+        "title": "ImportRead"
+      },
+      "ImportStatus": {
+        "type": "string",
+        "enum": [
+          "succeeded",
+          "partially_succeeded",
+          "failed"
+        ],
+        "title": "ImportStatus"
+      },
+      "ImportSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "examples": [
+              1
+            ]
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "examples": [
+              "employees.csv"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/ImportStatus",
+            "description": "`failed` when no row could be imported, including unreadable files."
+          },
+          "rows_succeeded": {
+            "type": "integer",
+            "title": "Rows Succeeded",
+            "description": "Created + updated + unchanged.",
+            "examples": [
+              11
+            ]
+          },
+          "rows_failed": {
+            "type": "integer",
+            "title": "Rows Failed",
+            "description": "Rows with at least one error.",
+            "examples": [
+              1
+            ]
+          },
+          "rows_created": {
+            "type": "integer",
+            "title": "Rows Created",
+            "examples": [
+              2
+            ]
+          },
+          "rows_updated": {
+            "type": "integer",
+            "title": "Rows Updated",
+            "examples": [
+              1
+            ]
+          },
+          "rows_unchanged": {
+            "type": "integer",
+            "title": "Rows Unchanged",
+            "description": "Rows identical to the stored employee, e.g. when a file is imported again.",
+            "examples": [
+              8
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "Why the whole file was rejected, if it was.",
+            "examples": [
+              null
+            ]
+          },
+          "file_sha256": {
+            "type": "string",
+            "title": "File Sha256"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "rows_total": {
+            "type": "integer",
+            "title": "Rows Total",
+            "readOnly": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "filename",
+          "status",
+          "rows_succeeded",
+          "rows_failed",
+          "rows_created",
+          "rows_updated",
+          "rows_unchanged",
+          "error",
+          "file_sha256",
+          "created_at",
+          "rows_total"
+        ],
+        "title": "ImportSummary"
+      },
+      "InvalidParam": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "examples": [
+              "page_size"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "examples": [
+              "Input should be less than or equal to 100"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "reason"
+        ],
+        "title": "InvalidParam"
+      },
+      "Page_EmployeeRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EmployeeRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Number of matching items across all pages.",
+            "examples": [
+              42
+            ]
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page",
+            "examples": [
+              1
+            ]
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size",
+            "examples": [
+              20
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Page[EmployeeRead]"
+      },
+      "Page_ImportSummary_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ImportSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Number of matching items across all pages.",
+            "examples": [
+              42
+            ]
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page",
+            "examples": [
+              1
+            ]
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size",
+            "examples": [
+              20
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Page[ImportSummary]"
+      },
+      "Page_SkillRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SkillRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Number of matching items across all pages.",
+            "examples": [
+              42
+            ]
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page",
+            "examples": [
+              1
+            ]
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size",
+            "examples": [
+              20
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Page[SkillRead]"
+      },
+      "ProblemDetail": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "default": "about:blank"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "examples": [
+              "Not Found"
+            ]
+          },
+          "status": {
+            "type": "integer",
+            "title": "Status",
+            "examples": [
+              404
+            ]
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail",
+            "examples": [
+              "Employee 42 does not exist"
+            ]
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/InvalidParam"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "status"
+        ],
+        "title": "ProblemDetail",
+        "description": "Error body following RFC 9457 (Problem Details for HTTP APIs)."
+      },
+      "ProficiencyLevel": {
+        "type": "integer",
+        "enum": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "title": "ProficiencyLevel"
+      },
+      "ReadinessResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unavailable"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "ReadinessResponse"
+      },
+      "RowErrorRead": {
+        "properties": {
+          "row": {
+            "type": "integer",
+            "title": "Row",
+            "description": "Line in the file; the header is line 1.",
+            "examples": [
+              3
+            ]
+          },
+          "field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field",
+            "description": "Column, if the problem is in one.",
+            "examples": [
+              "email"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "value is not a valid email address"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "row",
+          "field",
+          "message"
+        ],
+        "title": "RowErrorRead"
+      },
+      "SkillAssignmentRead": {
+        "properties": {
+          "skill": {
+            "$ref": "#/components/schemas/SkillRead"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "beginner",
+              "intermediate",
+              "advanced",
+              "expert"
+            ],
+            "description": "Ordered from lowest to highest."
+          }
+        },
+        "type": "object",
+        "required": [
+          "skill",
+          "level"
+        ],
+        "title": "SkillAssignmentRead"
+      },
+      "SkillAssignmentWrite": {
+        "properties": {
+          "level": {
+            "type": "string",
+            "enum": [
+              "beginner",
+              "intermediate",
+              "advanced",
+              "expert"
+            ],
+            "description": "Ordered from lowest to highest.",
+            "examples": [
+              "advanced"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "level"
+        ],
+        "title": "SkillAssignmentWrite"
+      },
+      "SkillCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "description": "Matched case-insensitively against existing skills; whitespace is collapsed.",
+            "examples": [
+              "Kubernetes"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "SkillCreate"
+      },
+      "SkillRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "examples": [
+              7
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "examples": [
+              "Kubernetes"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "SkillRead"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "employees",
+      "description": "Employees and the skills assigned to them."
+    },
+    {
+      "name": "skills",
+      "description": "The catalogue of skills employees can be assigned."
+    },
+    {
+      "name": "imports",
+      "description": "Upload employees as CSV and review past imports."
+    },
+    {
+      "name": "infrastructure",
+      "description": "Health probes for the load balancer."
+    }
+  ]
+}
