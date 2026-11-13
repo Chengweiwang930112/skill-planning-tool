@@ -175,7 +175,7 @@ export interface components {
              * File
              * @description CSV with a header row. Required columns: employee_number, first_name, last_name, email;
              *     optional: department, job_title, location, hire_date. Comma, semicolon or tab separated; UTF-8 or
-             *     Windows-1252; dates as YYYY-MM-DD or DD.MM.YYYY. At most 5 MB.
+             *     Windows-1252; dates as YYYY-MM-DD or DD.MM.YYYY. At most 10 MB and 50,000 rows.
              */
             file: string;
         };
@@ -863,7 +863,7 @@ export interface operations {
                     "application/json": components["schemas"]["ImportRead"];
                 };
             };
-            /** @description File larger than 5 MB */
+            /** @description File larger than 10 MB */
             413: {
                 headers: {
                     [name: string]: unknown;

@@ -9,7 +9,7 @@ from app.schemas import ImportRead, ImportSummary, Page, PageQuery
 from app.services import employee_import as service
 from app.services.csv_parsing import OPTIONAL_COLUMNS, REQUIRED_COLUMNS
 
-MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 router = APIRouter(
     prefix="/imports",
@@ -21,14 +21,14 @@ Session = Annotated[AsyncSession, Depends(get_session)]
 
 UPLOAD_DESCRIPTION = f"""CSV with a header row. Required columns: {", ".join(REQUIRED_COLUMNS)};
 optional: {", ".join(OPTIONAL_COLUMNS)}. Comma, semicolon or tab separated; UTF-8 or
-Windows-1252; dates as YYYY-MM-DD or DD.MM.YYYY. At most 5 MB."""
+Windows-1252; dates as YYYY-MM-DD or DD.MM.YYYY. At most 10 MB and 50,000 rows."""
 
 
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,
     summary="Import employees from a CSV file",
-    responses={status.HTTP_413_CONTENT_TOO_LARGE: problem_response("File larger than 5 MB")},
+    responses={status.HTTP_413_CONTENT_TOO_LARGE: problem_response("File larger than 10 MB")},
 )
 async def create_import(
     session: Session, file: Annotated[UploadFile, File(description=UPLOAD_DESCRIPTION)]
@@ -40,7 +40,7 @@ async def create_import(
     """
     content = await file.read(MAX_UPLOAD_BYTES + 1)
     if len(content) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "The file is larger than 5 MB")
+        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "The file is larger than 10 MB")
     record = await service.import_employees(session, file.filename or "upload.csv", content)
     return ImportRead.model_validate(record)
 

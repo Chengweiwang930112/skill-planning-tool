@@ -1,0 +1,61 @@
+<section class="d-flex flex-column gap-6">
+  <div>
+    <h2 class="si-h4 mb-1">{{ record().filename }}</h2>
+    <p class="si-caption text-secondary mb-0">
+      Imported {{ record().created_at | date: 'medium' }}
+    </p>
+  </div>
+
+  <si-inline-notification
+    [severity]="status().severity"
+    [heading]="status().label + '.'"
+    [message]="summary()"
+  />
+
+  <dl class="counts">
+    @for (count of counts(); track count.label) {
+      <div>
+        <dt class="si-caption text-secondary">{{ count.label }}</dt>
+        <dd class="si-h4 mb-0">{{ count.value | number }}</dd>
+      </div>
+    }
+  </dl>
+
+  @if (record().row_errors.length) {
+    <div>
+      <h3 class="si-h5">Row errors</h3>
+      @if (record().row_errors.length > shownErrors().length) {
+        <p class="text-secondary">
+          Showing the first {{ shownErrors().length | number }} of
+          {{ record().row_errors.length | number }} errors.
+        </p>
+      }
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th scope="col">Line</th>
+              <th scope="col">Column</th>
+              <th scope="col">Problem</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (error of shownErrors(); track $index) {
+              <tr>
+                <td>{{ error.row }}</td>
+                <td>{{ error.field ?? '—' }}</td>
+                <td>{{ error.message }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+
+  @if (record().rows_succeeded) {
+    <div>
+      <a class="btn btn-secondary" routerLink="/employees">View employees</a>
+    </div>
+  }
+</section>

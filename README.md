@@ -4,8 +4,8 @@ An internal tool for team leads: import employees from a CSV, keep track of
 their skills and proficiency levels, and answer questions such as *"who knows
 Kubernetes at an advanced level?"* without asking around in chat.
 
-> **Status: milestone M6 — frontend foundation.** The backend is feature-complete
-> and the frontend shows the employee overview; the features are built in
+> **Status: milestone M7 — import page.** The backend is feature-complete; the
+> frontend has the employee overview and the CSV import; the features are built in
 > the milestones listed under [Roadmap](#roadmap). Each milestone is a
 > self-contained commit with its own tests.
 
@@ -161,7 +161,9 @@ encoded, which covers what Excel exports in German and English locales.
   files rejected as a whole (missing columns, no data rows, unreadable
   encoding). `GET /api/v1/imports` lists them.
 - Imports run one at a time (a Postgres advisory lock), files are limited to
-  5 MB and 10,000 rows.
+  10 MB and 50,000 rows. 20,000 rows take about 4 seconds; existing employees
+  are looked up with one array parameter rather than one parameter per row,
+  which asyncpg caps at 32,767 per statement.
 
 The files in `samples/` cover these cases:
 
@@ -170,6 +172,13 @@ The files in `samples/` cover these cases:
 | `employees.csv`              | a clean file; against the demo data: 2 created, 2 updated, 8 unchanged |
 | `employees-excel-de.csv`     | a German Excel export: Windows-1252, `;`, CRLF, `DD.MM.YYYY` |
 | `employees-with-errors.csv`  | one example of each row error next to valid rows             |
+| `employees-20000.csv`        | 20,000 fictional employees, for trying the import at volume  |
+
+`employees-20000.csv` is generated and can be recreated byte for byte, or at
+another size: `cd backend && uv run python -m scripts.generate_employees 20000 ../samples/employees-20000.csv`.
+
+The import page in the frontend (`/imports`) takes a file by drag and drop,
+shows the report of the upload, and lists earlier imports with their reports.
 
 ## Quality gates
 

@@ -2,7 +2,8 @@ import hashlib
 from collections.abc import Sequence
 from dataclasses import asdict
 
-from sqlalchemy import func, select, text
+from sqlalchemy import String, any_, func, literal, select, text
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Employee, EmployeeImport, ImportStatus
@@ -68,18 +69,19 @@ def _without_duplicates(rows: list[ParsedRow], errors: list[RowError]) -> list[P
 async def _upsert(
     session: AsyncSession, rows: list[ParsedRow], errors: list[RowError], record: EmployeeImport
 ) -> None:
-    numbers = [parsed.employee.employee_number for parsed in rows]
-    emails = [parsed.employee.email for parsed in rows]
+    # One array parameter instead of IN (...): asyncpg allows at most 32767 parameters.
+    numbers = literal([parsed.employee.employee_number for parsed in rows], ARRAY(String))
+    emails = literal([parsed.employee.email for parsed in rows], ARRAY(String))
     existing = {
         employee.employee_number: employee
         for employee in await session.scalars(
-            select(Employee).where(Employee.employee_number.in_(numbers))
+            select(Employee).where(Employee.employee_number == any_(numbers))
         )
     }
     email_owners = {
         email: number
         for email, number in await session.execute(
-            select(Employee.email, Employee.employee_number).where(Employee.email.in_(emails))
+            select(Employee.email, Employee.employee_number).where(Employee.email == any_(emails))
         )
     }
 

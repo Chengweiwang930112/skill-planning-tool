@@ -1,0 +1,96 @@
+<h1 class="si-h3 mb-2">Import employees</h1>
+<p class="text-secondary mb-6">
+  Upload a CSV with the columns employee_number, first_name, last_name and email, plus optionally
+  department, job_title, location and hire_date. Importing a file again updates the employees in it
+  instead of duplicating them.
+</p>
+
+<section class="mb-8">
+  @if (uploading(); as fileName) {
+    <div class="d-flex align-items-center gap-4 py-8 justify-content-center" role="status">
+      <si-loading-spinner />
+      <span>Importing {{ fileName }}…</span>
+    </div>
+  } @else {
+    <si-file-dropzone
+      accept=".csv,text/csv"
+      acceptText="Accepted file type: CSV"
+      [maxFileSize]="maxUploadBytes"
+      uploadDropText="Drop a CSV file here or click to choose one"
+      (filesAdded)="upload($event)"
+      (fileError)="rejectFile($event)"
+    />
+  }
+
+  @if (uploadError(); as message) {
+    <si-inline-notification
+      class="d-block mt-4"
+      severity="danger"
+      heading="The file could not be imported."
+      [message]="message"
+    />
+  }
+  @if (result(); as record) {
+    <div class="mt-6">
+      <app-import-report [record]="record" />
+    </div>
+  }
+</section>
+
+<section>
+  <h2 class="si-h4 mb-4">Import history</h2>
+  @if (historyError(); as message) {
+    <si-inline-notification
+      severity="danger"
+      heading="The import history could not be loaded."
+      [message]="message"
+    />
+  } @else if (history.value(); as page) {
+    @if (page.total === 0) {
+      <p class="text-secondary">No imports yet.</p>
+    } @else {
+      <div class="table-responsive">
+        <table class="table table-hover align-middle">
+          <thead>
+            <tr>
+              <th scope="col">Imported</th>
+              <th scope="col">File</th>
+              <th scope="col">Status</th>
+              <th scope="col" class="text-end">Succeeded</th>
+              <th scope="col" class="text-end">Failed</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (entry of page.items; track entry.id) {
+              <tr>
+                <td>{{ entry.created_at | date: 'medium' }}</td>
+                <td>
+                  <a [routerLink]="['/imports', entry.id]">{{ entry.filename }}</a>
+                </td>
+                <td>
+                  <si-badge [type]="importStatus[entry.status].badge">
+                    {{ importStatus[entry.status].label }}
+                  </si-badge>
+                </td>
+                <td class="text-end">{{ entry.rows_succeeded | number }}</td>
+                <td class="text-end">{{ entry.rows_failed | number }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (page.total > historyPageSize) {
+        <si-pagination
+          class="mt-4"
+          navAriaLabel="Import history pages"
+          [currentPage]="page.page"
+          [pageSize]="historyPageSize"
+          [totalRowCount]="page.total"
+          (currentPageChange)="historyPage.set($event)"
+        />
+      }
+    }
+  } @else {
+    <si-loading-spinner />
+  }
+</section>

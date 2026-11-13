@@ -1,6 +1,6 @@
 import { httpResource } from '@angular/common/http';
 import { Component, computed, inject, input, numberAttribute } from '@angular/core';
-import { ActivatedRoute, Params, Router } from '@angular/router';
+import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import { SiBadgeComponent } from '@siemens/element-ng/badge';
 import { SiEmptyStateComponent } from '@siemens/element-ng/empty-state';
 import { SiInlineNotificationComponent } from '@siemens/element-ng/inline-notification';
@@ -20,6 +20,7 @@ type SortField = 'last_name' | 'employee_number' | 'department' | 'location';
 @Component({
   selector: 'app-employee-list',
   imports: [
+    RouterLink,
     SiBadgeComponent,
     SiEmptyStateComponent,
     SiInlineNotificationComponent,

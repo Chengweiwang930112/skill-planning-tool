@@ -28,7 +28,11 @@
           ? 'Try a different name, email or employee number.'
           : 'Import a CSV file to add employees.'
       "
-    />
+    >
+      @if (!q()) {
+        <a class="btn btn-primary" routerLink="/imports">Import employees</a>
+      }
+    </si-empty-state>
   } @else {
     <p class="text-secondary mb-4">
       {{ result.total }} {{ result.total === 1 ? 'employee' : 'employees' }}

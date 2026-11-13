@@ -3,8 +3,8 @@ from typing import Any
 
 from fastapi import status
 from httpx import AsyncClient
-from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import event, func, select
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.api.imports import MAX_UPLOAD_BYTES
 from app.models import Employee, EmployeeImport
@@ -176,3 +176,27 @@ async def test_unknown_import_is_a_404_problem(client: AsyncClient) -> None:
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
     assert response.json()["detail"] == "Import 999999 does not exist"
+
+
+async def test_looks_up_existing_employees_with_one_parameter_regardless_of_row_count(
+    client: AsyncClient, engine: AsyncEngine
+) -> None:
+    # asyncpg allows 32767 parameters per statement, so a parameter per row would fail
+    # for large files.
+    lookups: list[int] = []
+
+    def count_parameters(*args: Any) -> None:
+        statement, parameters = args[2], args[3]
+        if statement.lstrip().startswith("SELECT") and "FROM employee " in statement:
+            lookups.append(len(parameters))
+
+    rows = "".join(f"E-{n},Anna,Schmidt,anna.{n}@example.com\n" for n in range(500))
+    content = f"employee_number,first_name,last_name,email\n{rows}".encode()
+    event.listen(engine.sync_engine, "before_cursor_execute", count_parameters)
+    try:
+        record = await upload(client, content)
+    finally:
+        event.remove(engine.sync_engine, "before_cursor_execute", count_parameters)
+
+    assert record["rows_created"] == 500
+    assert lookups == [1, 1]

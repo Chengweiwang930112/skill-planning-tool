@@ -154,9 +154,11 @@ describe('EmployeeList', () => {
   it('distinguishes an empty directory from a search without matches', async () => {
     const empty = await respond(await open('/employees'), page([]));
     expect(empty.textContent).toContain('No employees yet');
+    expect(empty.querySelector('a[href="/imports"]')?.textContent).toBe('Import employees');
 
     const noMatch = await respond(await open('/employees?q=nobody'), page([]));
     expect(noMatch.textContent).toContain('No employees match your search');
+    expect(noMatch.querySelector('a[href="/imports"]')).toBeNull();
   });
 
   it('shows the problem detail when loading fails and retries on request', async () => {

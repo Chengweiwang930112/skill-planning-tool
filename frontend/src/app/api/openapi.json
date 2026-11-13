@@ -516,7 +516,7 @@
             }
           },
           "413": {
-            "description": "File larger than 5 MB",
+            "description": "File larger than 10 MB",
             "content": {
               "application/json": {
                 "schema": {
@@ -699,7 +699,7 @@
             "type": "string",
             "contentMediaType": "application/octet-stream",
             "title": "File",
-            "description": "CSV with a header row. Required columns: employee_number, first_name, last_name, email;\noptional: department, job_title, location, hire_date. Comma, semicolon or tab separated; UTF-8 or\nWindows-1252; dates as YYYY-MM-DD or DD.MM.YYYY. At most 5 MB."
+            "description": "CSV with a header row. Required columns: employee_number, first_name, last_name, email;\noptional: department, job_title, location, hire_date. Comma, semicolon or tab separated; UTF-8 or\nWindows-1252; dates as YYYY-MM-DD or DD.MM.YYYY. At most 10 MB and 50,000 rows."
           }
         },
         "type": "object",

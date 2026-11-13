@@ -18,7 +18,7 @@ from pydantic import (
 
 REQUIRED_COLUMNS = ("employee_number", "first_name", "last_name", "email")
 OPTIONAL_COLUMNS = ("department", "job_title", "location", "hire_date")
-MAX_ROWS = 10_000
+MAX_ROWS = 50_000
 
 
 class CsvFileError(Exception):

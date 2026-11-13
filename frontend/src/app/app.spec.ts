@@ -13,6 +13,7 @@ describe('App', () => {
     const links = [...host.querySelectorAll('si-header-navigation a')];
     expect(links.map((link) => [link.textContent?.trim(), link.getAttribute('href')])).toEqual([
       ['Employees', '/employees'],
+      ['Import', '/imports'],
     ]);
   });
 });

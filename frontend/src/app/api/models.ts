@@ -12,3 +12,9 @@ export type EmployeeQuery = NonNullable<
   operations['list_employees_api_v1_employees_get']['parameters']['query']
 >;
 export type EmployeeSort = NonNullable<EmployeeQuery['sort']>;
+
+export type ImportRecord = Schemas['ImportRead'];
+export type ImportSummary = Schemas['ImportSummary'];
+export type ImportPage = Schemas['Page_ImportSummary_'];
+export type ImportStatus = ImportSummary['status'];
+export type RowError = ImportRecord['row_errors'][number];
