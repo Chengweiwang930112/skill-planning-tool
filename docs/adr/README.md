@@ -15,3 +15,4 @@ supersedes the old one.
 | [0006](0006-skill-catalogue.md)         | A managed skill catalogue with a normalised key           |
 | [0007](0007-frontend.md)                | Element, generated API types and state in the URL         |
 | [0008](0008-ci-cd.md)                   | A GitHub Actions pipeline from lint to ECS                |
+| [0009](0009-synchronous-backend.md)     | A synchronous backend (supersedes part of 0001)           |

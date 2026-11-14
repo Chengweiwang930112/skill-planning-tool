@@ -1,10 +1,10 @@
-from collections.abc import AsyncIterator
+from collections.abc import Iterator
 
 from fastapi import Request
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 
-async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
-    sessionmaker: async_sessionmaker[AsyncSession] = request.app.state.sessionmaker
-    async with sessionmaker() as session:
+def get_session(request: Request) -> Iterator[Session]:
+    factory: sessionmaker[Session] = request.app.state.sessionmaker
+    with factory() as session:
         yield session

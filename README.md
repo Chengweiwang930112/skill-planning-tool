@@ -15,7 +15,7 @@ Kubernetes at an advanced level?"* without asking around in chat.
 
 | Layer    | Choice                                                                     |
 | -------- | -------------------------------------------------------------------------- |
-| Backend  | Python 3.12, FastAPI, SQLAlchemy 2.0 (async), PostgreSQL, Alembic           |
+| Backend  | Python 3.12, FastAPI, SQLAlchemy 2.0, psycopg 3, PostgreSQL, Alembic        |
 | Frontend | TypeScript, Angular 22 (standalone, signals, zoneless), Siemens Element     |
 | Tooling  | uv, ruff, mypy, pytest · npm, ESLint, Prettier, vitest · Docker, Compose    |
 
@@ -250,7 +250,7 @@ encoded, which covers what Excel exports in German and English locales.
 - Imports run one at a time (a Postgres advisory lock), files are limited to
   10 MB and 50,000 rows. 20,000 rows take about 4 seconds; existing employees
   are looked up with one array parameter rather than one parameter per row,
-  which asyncpg caps at 32,767 per statement.
+  which PostgreSQL caps at 65,535 per statement.
 
 The files in `samples/` cover these cases:
 

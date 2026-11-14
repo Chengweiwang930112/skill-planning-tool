@@ -1,7 +1,7 @@
 from itertools import count
 from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.models import Employee, EmployeeSkill, ProficiencyLevel, Skill
 
@@ -25,8 +25,8 @@ def make_employee(
     return employee
 
 
-async def persist(session: AsyncSession, *objects: object) -> None:
+def persist(session: Session, *objects: object) -> None:
     """Flush and detach, so the code under test loads from the database like a real request."""
     session.add_all(objects)
-    await session.flush()
+    session.flush()
     session.expunge_all()

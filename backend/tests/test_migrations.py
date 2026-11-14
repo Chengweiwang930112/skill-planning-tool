@@ -1,30 +1,24 @@
-import asyncio
 import re
 from collections.abc import Iterator
 
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy import create_engine, text
 
 from tests.conftest import TEST_DATABASE_URL
 
 
 def run_sql(*statements: str) -> list[tuple[object, ...]]:
     """Runs outside the tests' rolled-back transactions; returns the last result."""
-
-    async def run() -> list[tuple[object, ...]]:
-        engine = create_async_engine(TEST_DATABASE_URL)
-        rows: list[tuple[object, ...]] = []
-        async with engine.begin() as connection:
-            for statement in statements:
-                result = await connection.execute(text(statement))
-                rows = [tuple(row) for row in result] if result.returns_rows else []
-        await engine.dispose()
-        return rows
-
-    return asyncio.run(run())
+    engine = create_engine(TEST_DATABASE_URL)
+    rows: list[tuple[object, ...]] = []
+    with engine.begin() as connection:
+        for statement in statements:
+            result = connection.execute(text(statement))
+            rows = [tuple(row) for row in result] if result.returns_rows else []
+    engine.dispose()
+    return rows
 
 
 @pytest.fixture

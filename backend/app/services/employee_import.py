@@ -4,7 +4,7 @@ from dataclasses import asdict
 
 from sqlalchemy import String, any_, func, literal, select, text
 from sqlalchemy.dialects.postgresql import ARRAY
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.models import Employee, EmployeeImport, ImportStatus
 from app.services.csv_parsing import CsvFileError, ParsedRow, RowError, parse_employee_csv
@@ -14,8 +14,8 @@ from app.services.csv_parsing import CsvFileError, ParsedRow, RowError, parse_em
 IMPORT_LOCK_KEY = 4_201_001
 
 
-async def import_employees(session: AsyncSession, filename: str, content: bytes) -> EmployeeImport:
-    await session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": IMPORT_LOCK_KEY})
+def import_employees(session: Session, filename: str, content: bytes) -> EmployeeImport:
+    session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": IMPORT_LOCK_KEY})
     record = EmployeeImport(
         filename=filename,
         file_sha256=hashlib.sha256(content).hexdigest(),
@@ -31,7 +31,7 @@ async def import_employees(session: AsyncSession, filename: str, content: bytes)
         errors: list[RowError] = []
     else:
         errors = list(parsed.errors)
-        await _upsert(session, _without_duplicates(parsed.rows, errors), errors, record)
+        _upsert(session, _without_duplicates(parsed.rows, errors), errors, record)
 
     record.rows_succeeded = record.rows_created + record.rows_updated + record.rows_unchanged
     record.rows_failed = len({error.row for error in errors})
@@ -44,7 +44,7 @@ async def import_employees(session: AsyncSession, filename: str, content: bytes)
         else ImportStatus.SUCCEEDED
     )
     session.add(record)
-    await session.commit()
+    session.commit()
     return record
 
 
@@ -66,21 +66,21 @@ def _without_duplicates(rows: list[ParsedRow], errors: list[RowError]) -> list[P
     return unique
 
 
-async def _upsert(
-    session: AsyncSession, rows: list[ParsedRow], errors: list[RowError], record: EmployeeImport
+def _upsert(
+    session: Session, rows: list[ParsedRow], errors: list[RowError], record: EmployeeImport
 ) -> None:
-    # One array parameter instead of IN (...): asyncpg allows at most 32767 parameters.
+    # One array parameter instead of IN (...): PostgreSQL allows at most 65535 parameters.
     numbers = literal([parsed.employee.employee_number for parsed in rows], ARRAY(String))
     emails = literal([parsed.employee.email for parsed in rows], ARRAY(String))
     existing = {
         employee.employee_number: employee
-        for employee in await session.scalars(
+        for employee in session.scalars(
             select(Employee).where(Employee.employee_number == any_(numbers))
         )
     }
     email_owners = {
         email: number
-        for email, number in await session.execute(
+        for email, number in session.execute(
             select(Employee.email, Employee.employee_number).where(Employee.email == any_(emails))
         )
     }
@@ -104,11 +104,11 @@ async def _upsert(
             record.rows_updated += 1
 
 
-async def list_imports(
-    session: AsyncSession, page: int, page_size: int
+def list_imports(
+    session: Session, page: int, page_size: int
 ) -> tuple[Sequence[EmployeeImport], int]:
-    total = await session.scalar(select(func.count()).select_from(EmployeeImport))
-    imports = await session.scalars(
+    total = session.scalar(select(func.count()).select_from(EmployeeImport))
+    imports = session.scalars(
         select(EmployeeImport)
         .order_by(EmployeeImport.created_at.desc(), EmployeeImport.id.desc())
         .limit(page_size)
@@ -117,5 +117,5 @@ async def list_imports(
     return imports.all(), total or 0
 
 
-async def get_import(session: AsyncSession, import_id: int) -> EmployeeImport | None:
-    return await session.get(EmployeeImport, import_id)
+def get_import(session: Session, import_id: int) -> EmployeeImport | None:
+    return session.get(EmployeeImport, import_id)

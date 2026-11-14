@@ -2,8 +2,8 @@ from typing import Any
 
 import pytest
 from fastapi import status
-from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
 from app.models import ProficiencyLevel, Skill
 from tests.factories import make_employee, persist
@@ -13,9 +13,9 @@ BEGINNER, INTERMEDIATE, ADVANCED, EXPERT = ProficiencyLevel
 
 
 @pytest.fixture
-async def team(session: AsyncSession) -> None:
+def team(session: Session) -> None:
     k8s, python, go = Skill(name="Kubernetes"), Skill(name="Python"), Skill(name="Go")
-    await persist(
+    persist(
         session,
         make_employee({k8s: INTERMEDIATE, python: EXPERT}, last_name="Intermediate"),
         make_employee({k8s: ADVANCED, python: BEGINNER}, last_name="Advanced"),
@@ -24,34 +24,32 @@ async def team(session: AsyncSession) -> None:
     )
 
 
-async def search(client: AsyncClient, *skills: str, **params: Any) -> list[str]:
-    response = await client.get(URL, params={"skill": list(skills), **params})
+def search(client: TestClient, *skills: str, **params: Any) -> list[str]:
+    response = client.get(URL, params={"skill": list(skills), **params})
     assert response.status_code == status.HTTP_200_OK, response.text
     return [employee["last_name"] for employee in response.json()["items"]]
 
 
 @pytest.mark.usefixtures("team")
-async def test_finds_employees_at_the_level_or_higher(client: AsyncClient) -> None:
-    assert await search(client, "kubernetes:advanced") == ["Advanced", "Expert"]
+def test_finds_employees_at_the_level_or_higher(client: TestClient) -> None:
+    assert search(client, "kubernetes:advanced") == ["Advanced", "Expert"]
 
 
 @pytest.mark.usefixtures("team")
 @pytest.mark.parametrize("criterion", ["Kubernetes", "KUBERNETES:beginner", " kubernetes "])
-async def test_a_skill_without_a_level_matches_any_level(
-    client: AsyncClient, criterion: str
-) -> None:
-    assert await search(client, criterion) == ["Advanced", "Expert", "Intermediate"]
+def test_a_skill_without_a_level_matches_any_level(client: TestClient, criterion: str) -> None:
+    assert search(client, criterion) == ["Advanced", "Expert", "Intermediate"]
 
 
 @pytest.mark.usefixtures("team")
-async def test_requires_every_skill_when_several_are_given(client: AsyncClient) -> None:
-    assert await search(client, "kubernetes:advanced", "python") == ["Advanced"]
-    assert await search(client, "kubernetes:advanced", "python:advanced") == []
+def test_requires_every_skill_when_several_are_given(client: TestClient) -> None:
+    assert search(client, "kubernetes:advanced", "python") == ["Advanced"]
+    assert search(client, "kubernetes:advanced", "python:advanced") == []
 
 
 @pytest.mark.usefixtures("team")
-async def test_combines_with_the_other_filters_and_counts_matches(client: AsyncClient) -> None:
-    response = await client.get(
+def test_combines_with_the_other_filters_and_counts_matches(client: TestClient) -> None:
+    response = client.get(
         URL, params={"skill": "kubernetes:advanced", "department": "mobility", "page_size": 1}
     )
 
@@ -60,10 +58,10 @@ async def test_combines_with_the_other_filters_and_counts_matches(client: AsyncC
 
 
 @pytest.mark.usefixtures("team")
-async def test_returns_all_skills_of_a_match_not_only_the_searched_one(
-    client: AsyncClient,
+def test_returns_all_skills_of_a_match_not_only_the_searched_one(
+    client: TestClient,
 ) -> None:
-    response = await client.get(URL, params={"skill": "go"})
+    response = client.get(URL, params={"skill": "go"})
 
     [employee] = response.json()["items"]
     assert [(s["skill"]["name"], s["level"]) for s in employee["skills"]] == [
@@ -73,8 +71,8 @@ async def test_returns_all_skills_of_a_match_not_only_the_searched_one(
 
 
 @pytest.mark.usefixtures("team")
-async def test_an_unknown_skill_matches_nobody(client: AsyncClient) -> None:
-    assert await search(client, "cobol") == []
+def test_an_unknown_skill_matches_nobody(client: TestClient) -> None:
+    assert search(client, "cobol") == []
 
 
 @pytest.mark.parametrize(
@@ -86,10 +84,10 @@ async def test_an_unknown_skill_matches_nobody(client: AsyncClient) -> None:
     ],
     ids=["unknown-level", "missing-name", "too-many"],
 )
-async def test_rejects_malformed_criteria(
-    client: AsyncClient, skills: list[str], name: str, reason: str
+def test_rejects_malformed_criteria(
+    client: TestClient, skills: list[str], name: str, reason: str
 ) -> None:
-    response = await client.get(URL, params={"skill": skills})
+    response = client.get(URL, params={"skill": skills})
 
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
     [error] = response.json()["errors"]

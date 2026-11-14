@@ -3,7 +3,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.gzip import GZipMiddleware
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 from app import __version__
 from app.api.employees import router as employees_router
@@ -25,12 +26,16 @@ OPENAPI_TAGS = [
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
-    engine = create_async_engine(settings.database_url, pool_pre_ping=True)
+    # libpq has no connect timeout of its own: an unreachable database (say, a wrong
+    # security group) would hold every request, and its worker thread, for minutes.
+    engine = create_engine(
+        settings.database_url, pool_pre_ping=True, connect_args={"connect_timeout": 5}
+    )
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         yield
-        await engine.dispose()
+        engine.dispose()
 
     app = FastAPI(
         title=settings.app_name,
@@ -43,7 +48,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     app.state.settings = settings
-    app.state.sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
+    app.state.sessionmaker = sessionmaker(engine, expire_on_commit=False)
     register_error_handlers(app)
     app.middleware("http")(reject_oversized_requests)
     app.add_middleware(GZipMiddleware, minimum_size=1024)

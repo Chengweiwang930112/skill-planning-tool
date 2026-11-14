@@ -1,6 +1,7 @@
 # 0001 — Async FastAPI with SQLAlchemy 2 and PostgreSQL
 
-Status: accepted
+Status: superseded in part by [0009](0009-synchronous-backend.md), which makes
+the backend synchronous; PostgreSQL, the layering and the tests still apply
 
 ## Context
 

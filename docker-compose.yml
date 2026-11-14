@@ -24,7 +24,7 @@ services:
     image: skill-planning
     command: ["alembic", "upgrade", "head"]
     environment:
-      APP_DATABASE_URL: postgresql+asyncpg://skills:skills@db:5432/skills
+      APP_DATABASE_URL: postgresql+psycopg://skills:skills@db:5432/skills
     depends_on:
       db:
         condition: service_healthy
@@ -34,7 +34,7 @@ services:
     build: .
     image: skill-planning
     environment:
-      APP_DATABASE_URL: postgresql+asyncpg://skills:skills@db:5432/skills
+      APP_DATABASE_URL: postgresql+psycopg://skills:skills@db:5432/skills
       # The image defaults to production, which hides Swagger UI; show it locally.
       APP_ENVIRONMENT: local
     ports:

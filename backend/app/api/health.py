@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Response, status
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app import __version__
 from app.core.database import get_session
@@ -24,7 +24,7 @@ class ReadinessResponse(BaseModel):
 # Liveness must not depend on the database: a probe that fails during a brief
 # database outage makes the orchestrator restart healthy tasks.
 @router.get("/healthz", summary="Liveness probe")
-async def healthz() -> HealthResponse:
+def healthz() -> HealthResponse:
     return HealthResponse(status="ok", version=__version__)
 
 
@@ -33,11 +33,11 @@ async def healthz() -> HealthResponse:
     summary="Readiness probe",
     responses={status.HTTP_503_SERVICE_UNAVAILABLE: {"model": ReadinessResponse}},
 )
-async def readyz(
-    session: Annotated[AsyncSession, Depends(get_session)], response: Response
+def readyz(
+    session: Annotated[Session, Depends(get_session)], response: Response
 ) -> ReadinessResponse:
     try:
-        await session.execute(text("SELECT 1"))
+        session.execute(text("SELECT 1"))
     except (SQLAlchemyError, OSError):
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         return ReadinessResponse(status="unavailable")

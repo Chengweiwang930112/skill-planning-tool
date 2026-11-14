@@ -5,21 +5,20 @@ description = "Backend API for the Staff & Skill Planning Tool"
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.20.1",
-    "asyncpg>=0.32.0",
     "email-validator>=2.3.0",
     "fastapi>=0.115",
+    "psycopg[binary]>=3.2",
     "pydantic-settings>=2.7",
     "python-multipart>=0.0.33",
-    "sqlalchemy[asyncio]>=2.0",
+    "sqlalchemy>=2.0",
     "uvicorn[standard]>=0.34",
 ]
 
 [dependency-groups]
 dev = [
-    "httpx>=0.28",
+    "httpx2>=2.16",
     "mypy>=1.14",
     "pytest>=8.3",
-    "pytest-asyncio>=0.25",
     "pytest-cov>=6.0",
     "ruff>=0.9",
 ]
@@ -41,14 +40,9 @@ addopts = """
     --cov-report=term-missing
     --cov-fail-under=80
 """
-asyncio_mode = "auto"
-# One event loop for the whole run: asyncpg connections are bound to the loop
-# that opened them, and the engine is shared across tests.
-asyncio_default_fixture_loop_scope = "session"
-asyncio_default_test_loop_scope = "session"
 
 [tool.coverage.run]
-concurrency = ["thread", "greenlet"]
+concurrency = ["thread"]
 branch = true
 source = ["app"]
 

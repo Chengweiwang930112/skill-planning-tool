@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     app_name: str = "Staff & Skill Planning Tool"
     environment: Environment = "local"
     api_v1_prefix: str = "/api/v1"
-    database_url: str = "postgresql+asyncpg://skills:skills@localhost:5432/skills"
+    database_url: str = "postgresql+psycopg://skills:skills@localhost:5432/skills"
     # The built frontend, served alongside the API; the container image sets it.
     static_dir: Path | None = None
 

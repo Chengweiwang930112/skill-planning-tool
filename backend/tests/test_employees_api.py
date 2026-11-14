@@ -2,8 +2,8 @@ from typing import Any
 
 import pytest
 from fastapi import status
-from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
 from app.models import ProficiencyLevel, Skill
 from tests.factories import make_employee, persist
@@ -11,8 +11,8 @@ from tests.factories import make_employee, persist
 URL = "/api/v1/employees"
 
 
-async def get_json(client: AsyncClient, url: str, **params: Any) -> Any:
-    response = await client.get(url, params=params)
+def get_json(client: TestClient, url: str, **params: Any) -> Any:
+    response = client.get(url, params=params)
     assert response.status_code == status.HTTP_200_OK, response.text
     return response.json()
 
@@ -21,15 +21,13 @@ def last_names(page: dict[str, Any]) -> list[str]:
     return [item["last_name"] for item in page["items"]]
 
 
-async def test_lists_nothing_when_there_are_no_employees(client: AsyncClient) -> None:
-    assert await get_json(client, URL) == {"items": [], "total": 0, "page": 1, "page_size": 20}
+def test_lists_nothing_when_there_are_no_employees(client: TestClient) -> None:
+    assert get_json(client, URL) == {"items": [], "total": 0, "page": 1, "page_size": 20}
 
 
-async def test_lists_employees_with_skills_strongest_first(
-    client: AsyncClient, session: AsyncSession
-) -> None:
+def test_lists_employees_with_skills_strongest_first(client: TestClient, session: Session) -> None:
     python, k8s = Skill(name="Python"), Skill(name="Kubernetes")
-    await persist(
+    persist(
         session,
         make_employee(
             {python: ProficiencyLevel.BEGINNER, k8s: ProficiencyLevel.EXPERT},
@@ -41,7 +39,7 @@ async def test_lists_employees_with_skills_strongest_first(
         ),
     )
 
-    [employee] = (await get_json(client, URL))["items"]
+    [employee] = (get_json(client, URL))["items"]
 
     assert employee["employee_number"] == "E-1001"
     assert employee["department"] == "Digital Industries"
@@ -51,19 +49,19 @@ async def test_lists_employees_with_skills_strongest_first(
     ]
 
 
-async def test_paginates_and_reports_the_total(client: AsyncClient, session: AsyncSession) -> None:
-    await persist(session, *(make_employee(last_name=name) for name in "ABCDE"))
+def test_paginates_and_reports_the_total(client: TestClient, session: Session) -> None:
+    persist(session, *(make_employee(last_name=name) for name in "ABCDE"))
 
-    page = await get_json(client, URL, page=2, page_size=2)
+    page = get_json(client, URL, page=2, page_size=2)
 
     assert last_names(page) == ["C", "D"]
     assert (page["total"], page["page"], page["page_size"]) == (5, 2, 2)
 
 
-async def test_a_page_beyond_the_end_is_empty(client: AsyncClient, session: AsyncSession) -> None:
-    await persist(session, make_employee())
+def test_a_page_beyond_the_end_is_empty(client: TestClient, session: Session) -> None:
+    persist(session, make_employee())
 
-    page = await get_json(client, URL, page=3)
+    page = get_json(client, URL, page=3)
 
     assert (page["items"], page["total"]) == ([], 1)
 
@@ -72,26 +70,26 @@ async def test_a_page_beyond_the_end_is_empty(client: AsyncClient, session: Asyn
     ("sort", "expected"),
     [("department", ["B", "A", "C"]), ("-department", ["A", "B", "C"])],
 )
-async def test_sorts_with_missing_values_last(
-    client: AsyncClient, session: AsyncSession, sort: str, expected: list[str]
+def test_sorts_with_missing_values_last(
+    client: TestClient, session: Session, sort: str, expected: list[str]
 ) -> None:
-    await persist(
+    persist(
         session,
         make_employee(last_name="A", department="Mobility"),
         make_employee(last_name="B", department="Healthineers"),
         make_employee(last_name="C", department=None),
     )
 
-    assert last_names(await get_json(client, URL, sort=sort)) == expected
+    assert last_names(get_json(client, URL, sort=sort)) == expected
 
 
 @pytest.mark.parametrize(
     "q", ["anna schmidt", "SCHMIDT", "anna.schmidt@example", "e-1001"], ids=str
 )
-async def test_searches_name_email_and_employee_number(
-    client: AsyncClient, session: AsyncSession, q: str
+def test_searches_name_email_and_employee_number(
+    client: TestClient, session: Session, q: str
 ) -> None:
-    await persist(
+    persist(
         session,
         make_employee(
             employee_number="E-1001",
@@ -102,27 +100,23 @@ async def test_searches_name_email_and_employee_number(
         make_employee(first_name="Jonas", last_name="Fischer", email="jonas@example.com"),
     )
 
-    assert last_names(await get_json(client, URL, q=q)) == ["Schmidt"]
+    assert last_names(get_json(client, URL, q=q)) == ["Schmidt"]
 
 
-async def test_search_treats_wildcards_literally(
-    client: AsyncClient, session: AsyncSession
-) -> None:
-    await persist(session, make_employee(last_name="Schmidt"))
+def test_search_treats_wildcards_literally(client: TestClient, session: Session) -> None:
+    persist(session, make_employee(last_name="Schmidt"))
 
-    assert (await get_json(client, URL, q="%"))["total"] == 0
+    assert (get_json(client, URL, q="%"))["total"] == 0
 
 
-async def test_filters_by_department_ignoring_case(
-    client: AsyncClient, session: AsyncSession
-) -> None:
-    await persist(
+def test_filters_by_department_ignoring_case(client: TestClient, session: Session) -> None:
+    persist(
         session,
         make_employee(last_name="A", department="Mobility"),
         make_employee(last_name="B", department="Healthineers"),
     )
 
-    assert last_names(await get_json(client, URL, department="mobility")) == ["A"]
+    assert last_names(get_json(client, URL, department="mobility")) == ["A"]
 
 
 @pytest.mark.parametrize(
@@ -130,10 +124,10 @@ async def test_filters_by_department_ignoring_case(
     [({"page_size": 101}, "page_size"), ({"page": 0}, "page"), ({"sort": "salary"}, "sort")],
     ids=["page_size", "page", "sort"],
 )
-async def test_rejects_invalid_parameters_as_problem_details(
-    client: AsyncClient, params: dict[str, Any], invalid: str
+def test_rejects_invalid_parameters_as_problem_details(
+    client: TestClient, params: dict[str, Any], invalid: str
 ) -> None:
-    response = await client.get(URL, params=params)
+    response = client.get(URL, params=params)
 
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
     assert response.headers["content-type"] == "application/problem+json"
@@ -142,18 +136,18 @@ async def test_rejects_invalid_parameters_as_problem_details(
     assert [error["name"] for error in body["errors"]] == [invalid]
 
 
-async def test_gets_one_employee(client: AsyncClient, session: AsyncSession) -> None:
+def test_gets_one_employee(client: TestClient, session: Session) -> None:
     employee = make_employee({Skill(name="Go"): ProficiencyLevel.ADVANCED}, last_name="Schmidt")
-    await persist(session, employee)
+    persist(session, employee)
 
-    body = await get_json(client, f"{URL}/{employee.id}")
+    body = get_json(client, f"{URL}/{employee.id}")
 
     assert body["last_name"] == "Schmidt"
     assert [(s["skill"]["name"], s["level"]) for s in body["skills"]] == [("Go", "advanced")]
 
 
-async def test_unknown_employee_is_a_404_problem(client: AsyncClient) -> None:
-    response = await client.get(f"{URL}/999999")
+def test_unknown_employee_is_a_404_problem(client: TestClient) -> None:
+    response = client.get(f"{URL}/999999")
 
     assert response.status_code == status.HTTP_404_NOT_FOUND
     assert response.headers["content-type"] == "application/problem+json"
@@ -165,10 +159,10 @@ async def test_unknown_employee_is_a_404_problem(client: AsyncClient) -> None:
     }
 
 
-async def test_openapi_documents_problem_details_instead_of_the_default_error(
-    client: AsyncClient,
+def test_openapi_documents_problem_details_instead_of_the_default_error(
+    client: TestClient,
 ) -> None:
-    schema = (await client.get("/openapi.json")).json()
+    schema = (client.get("/openapi.json")).json()
     list_operation = schema["paths"][URL]["get"]
 
     assert "HTTPValidationError" not in schema["components"]["schemas"]

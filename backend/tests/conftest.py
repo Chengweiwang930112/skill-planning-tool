@@ -1,20 +1,21 @@
 import os
-from collections.abc import AsyncIterator
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi import FastAPI
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
+from fastapi.testclient import TestClient
+from sqlalchemy import Engine, create_engine
+from sqlalchemy.orm import Session
 
 from app.core.config import Settings
 from app.core.database import get_session
 from app.main import create_app
 
 TEST_DATABASE_URL = os.environ.get(
-    "APP_TEST_DATABASE_URL", "postgresql+asyncpg://skills:skills@localhost:5432/skills_test"
+    "APP_TEST_DATABASE_URL", "postgresql+psycopg://skills:skills@localhost:5432/skills_test"
 )
 
 
@@ -32,21 +33,21 @@ def migrated_database(alembic_config: Config) -> None:
 
 
 @pytest.fixture(scope="session")
-async def engine(migrated_database: None) -> AsyncIterator[AsyncEngine]:
-    engine = create_async_engine(TEST_DATABASE_URL)
+def engine(migrated_database: None) -> Iterator[Engine]:
+    engine = create_engine(TEST_DATABASE_URL)
     yield engine
-    await engine.dispose()
+    engine.dispose()
 
 
 @pytest.fixture
-async def session(engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
-    async with engine.connect() as connection:
-        transaction = await connection.begin()
-        async with AsyncSession(
+def session(engine: Engine) -> Iterator[Session]:
+    with engine.connect() as connection:
+        transaction = connection.begin()
+        with Session(
             bind=connection, join_transaction_mode="create_savepoint", expire_on_commit=False
         ) as session:
             yield session
-        await transaction.rollback()
+        transaction.rollback()
 
 
 @pytest.fixture
@@ -55,10 +56,10 @@ def settings() -> Settings:
 
 
 @pytest.fixture
-def app(settings: Settings, session: AsyncSession) -> FastAPI:
+def app(settings: Settings, session: Session) -> FastAPI:
     app = create_app(settings)
 
-    async def override_session() -> AsyncIterator[AsyncSession]:
+    def override_session() -> Iterator[Session]:
         yield session
         # Every request gets a fresh session in production; forget what this one loaded.
         session.expunge_all()
@@ -68,7 +69,6 @@ def app(settings: Settings, session: AsyncSession) -> FastAPI:
 
 
 @pytest.fixture
-async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+def client(app: FastAPI) -> Iterator[TestClient]:
+    with TestClient(app) as client:
         yield client

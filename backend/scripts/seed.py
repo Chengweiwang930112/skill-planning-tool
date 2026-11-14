@@ -1,10 +1,9 @@
 """Fill an empty database with fictional demo data: `uv run python -m scripts.seed`."""
 
-import asyncio
 from datetime import date
 
-from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy import create_engine, func, select
+from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.models import Employee, EmployeeSkill, ProficiencyLevel, Skill
@@ -42,36 +41,36 @@ EMPLOYEES = [
 ]  # fmt: skip
 
 
-async def seed() -> None:
-    engine = create_async_engine(get_settings().database_url)
+def seed() -> None:
+    engine = create_engine(get_settings().database_url)
     try:
-        await _insert(async_sessionmaker(engine))
+        with Session(engine) as session, session.begin():
+            _insert(session)
     finally:
-        await engine.dispose()
+        engine.dispose()
 
 
-async def _insert(sessionmaker: async_sessionmaker[AsyncSession]) -> None:
-    async with sessionmaker() as session, session.begin():
-        if await session.scalar(select(func.count()).select_from(Employee)):
-            print("Database already has employees, nothing to do.")
-            return
+def _insert(session: Session) -> None:
+    if session.scalar(select(func.count()).select_from(Employee)):
+        print("Database already has employees, nothing to do.")
+        return
 
-        skills = {name: Skill(name=name) for name in SKILLS}
-        for number, first, last, department, title, location, hired, levels in EMPLOYEES:
-            employee = Employee(
-                employee_number=number,
-                first_name=first,
-                last_name=last,
-                email=f"{first}.{last}@example.com".lower().replace("ü", "ue"),
-                department=department,
-                job_title=title,
-                location=location,
-                hire_date=hired,
-                skills=[EmployeeSkill(skill=skills[s], level=lvl) for s, lvl in levels.items()],
-            )
-            session.add(employee)
-        print(f"Seeded {len(EMPLOYEES)} employees and {len(SKILLS)} skills.")
+    skills = {name: Skill(name=name) for name in SKILLS}
+    for number, first, last, department, title, location, hired, levels in EMPLOYEES:
+        employee = Employee(
+            employee_number=number,
+            first_name=first,
+            last_name=last,
+            email=f"{first}.{last}@example.com".lower().replace("ü", "ue"),
+            department=department,
+            job_title=title,
+            location=location,
+            hire_date=hired,
+            skills=[EmployeeSkill(skill=skills[s], level=lvl) for s, lvl in levels.items()],
+        )
+        session.add(employee)
+    print(f"Seeded {len(EMPLOYEES)} employees and {len(SKILLS)} skills.")
 
 
 if __name__ == "__main__":
-    asyncio.run(seed())
+    seed()
