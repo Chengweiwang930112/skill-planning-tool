@@ -62,11 +62,14 @@ async def replace_skills(
     session: Session, employee_id: int, body: EmployeeSkillsWrite
 ) -> EmployeeRead:
     """Sets the employee's complete set of skills in one transaction: listed skills are
-    assigned at their level, creating catalogue entries for new names, and all others are
-    removed. Use this to save several edits at once; it either applies all or none."""
+    assigned at their level, all others are removed. Skills come from the catalogue
+    (`GET /skills`); unknown ids are rejected. Either all changes apply or none."""
     if await service.get_employee(session, employee_id) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"Employee {employee_id} does not exist")
-    await service.replace_skills(session, employee_id, body.skills)
+    try:
+        await service.replace_skills(session, employee_id, body.skills)
+    except service.UnknownSkillsError as error:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)) from None
     # The existence check loaded the old skills into the session; read the new ones.
     session.expunge_all()
     employee = await service.get_employee(session, employee_id)

@@ -13,6 +13,11 @@ export const routes: Routes = [
     loadComponent: () => import('./search/skill-search').then((m) => m.SkillSearch),
   },
   {
+    path: 'skills',
+    title: 'Skills · Staff & Skill Planning',
+    loadComponent: () => import('./skills/skill-catalogue').then((m) => m.SkillCatalogue),
+  },
+  {
     path: 'imports',
     title: 'Import · Staff & Skill Planning',
     loadComponent: () => import('./imports/import-page').then((m) => m.ImportPage),

@@ -52,8 +52,8 @@ export interface paths {
         /**
          * Replace all skills of an employee
          * @description Sets the employee's complete set of skills in one transaction: listed skills are
-         *     assigned at their level, creating catalogue entries for new names, and all others are
-         *     removed. Use this to save several edits at once; it either applies all or none.
+         *     assigned at their level, all others are removed. Skills come from the catalogue
+         *     (`GET /skills`); unknown ids are rejected. Either all changes apply or none.
          */
         put: operations["replace_skills_api_v1_employees__employee_id__skills_put"];
         post?: never;
@@ -95,17 +95,60 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List skills
-         * @description The skill catalogue, alphabetically; `q` narrows it down for autocompletion.
+         * List the skill catalogue
+         * @description Alphabetically, with how many employees have each skill; `q` narrows the list down,
+         *     e.g. for autocompletion, ignoring case, spaces and punctuation.
          */
         get: operations["list_skills_api_v1_skills_get"];
         put?: never;
         /**
-         * Create a skill, or get the existing one
-         * @description Names are unique regardless of case: asking for `kubernetes` when `Kubernetes`
-         *     exists returns the existing skill with 200 instead of creating a near-duplicate.
+         * Add a skill
+         * @description Names must be unique ignoring case, spaces and punctuation, so that the catalogue
+         *     does not end up with Node.js next to NodeJS.
          */
         post: operations["create_skill_api_v1_skills_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/skills/{skill_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a skill nobody has */
+        delete: operations["delete_skill_api_v1_skills__skill_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Rename a skill
+         * @description Every employee with the skill shows the new name.
+         */
+        patch: operations["rename_skill_api_v1_skills__skill_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/skills/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add skills from a CSV file
+         * @description Adds every name not yet in the catalogue; importing the same file again changes
+         *     nothing. Meant for moving an existing list of skills in at once.
+         */
+        post: operations["import_skills_api_v1_skills_import_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -198,6 +241,14 @@ export interface components {
              * @description CSV with a header row. Required columns: employee_number, first_name, last_name, email;
              *     optional: department, job_title, location, hire_date. Comma, semicolon or tab separated; UTF-8 or
              *     Windows-1252; dates as YYYY-MM-DD or DD.MM.YYYY. At most 10 MB and 50,000 rows.
+             */
+            file: string;
+        };
+        /** Body_import_skills_api_v1_skills_import_post */
+        Body_import_skills_api_v1_skills_import_post: {
+            /**
+             * File
+             * @description CSV with a `name` column; UTF-8 or Windows-1252.
              */
             file: string;
         };
@@ -453,10 +504,10 @@ export interface components {
              */
             page_size: number;
         };
-        /** Page[SkillRead] */
-        Page_SkillRead_: {
+        /** Page[SkillWithUsage] */
+        Page_SkillWithUsage_: {
             /** Items */
-            items: components["schemas"]["SkillRead"][];
+            items: components["schemas"]["SkillWithUsage"][];
             /**
              * Total
              * @description Number of matching items across all pages.
@@ -553,22 +604,30 @@ export interface components {
              */
             level: "beginner" | "intermediate" | "advanced" | "expert";
         };
-        /** SkillCreate */
-        SkillCreate: {
+        /** SkillImportResult */
+        SkillImportResult: {
             /**
-             * Name
-             * @description Matched case-insensitively against existing skills; whitespace is collapsed.
-             * @example Kubernetes
+             * Rows Created
+             * @example 24
              */
-            name: string;
+            rows_created: number;
+            /**
+             * Rows Existing
+             * @description Names already in the catalogue or earlier in the file.
+             * @example 3
+             */
+            rows_existing: number;
+            /** Row Errors */
+            row_errors: components["schemas"]["RowErrorRead"][];
         };
         /** SkillLevelWrite */
         SkillLevelWrite: {
             /**
-             * Name
-             * @example Kubernetes
+             * Skill Id
+             * @description A skill from the catalogue.
+             * @example 7
              */
-            name: string;
+            skill_id: number;
             /**
              * @description Ordered from lowest to highest.
              * @example advanced
@@ -585,6 +644,34 @@ export interface components {
             id: number;
             /**
              * Name
+             * @example Kubernetes
+             */
+            name: string;
+        };
+        /** SkillWithUsage */
+        SkillWithUsage: {
+            /**
+             * Id
+             * @example 7
+             */
+            id: number;
+            /**
+             * Name
+             * @example Kubernetes
+             */
+            name: string;
+            /**
+             * Employee Count
+             * @description Employees who have the skill.
+             * @example 12
+             */
+            employee_count: number;
+        };
+        /** SkillWrite */
+        SkillWrite: {
+            /**
+             * Name
+             * @description Unique ignoring case, spaces and punctuation: Node.js and NodeJS clash.
              * @example Kubernetes
              */
             name: string;
@@ -824,7 +911,7 @@ export interface operations {
                 page?: number;
                 /** @description Items per page (max 100). */
                 page_size?: number;
-                /** @description Case-insensitive part of the name. */
+                /** @description Part of the name, ignoring case, spaces and punctuation. */
                 q?: string | null;
             };
             header?: never;
@@ -839,7 +926,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Page_SkillRead_"];
+                    "application/json": components["schemas"]["Page_SkillWithUsage_"];
                 };
             };
             /** @description Invalid parameters */
@@ -862,11 +949,102 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SkillCreate"];
+                "application/json": components["schemas"]["SkillWrite"];
             };
         };
         responses: {
-            /** @description The skill already existed */
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillRead"];
+                };
+            };
+            /** @description A skill with this name exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Invalid parameters */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    delete_skill_api_v1_skills__skill_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skill_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Skill not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Employees have the skill */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Invalid parameters */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    rename_skill_api_v1_skills__skill_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skill_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkillWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -875,13 +1053,64 @@ export interface operations {
                     "application/json": components["schemas"]["SkillRead"];
                 };
             };
-            /** @description Successful Response */
-            201: {
+            /** @description Skill not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SkillRead"];
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description A skill with this name exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Invalid parameters */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    import_skills_api_v1_skills_import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_import_skills_api_v1_skills_import_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SkillImportResult"];
+                };
+            };
+            /** @description File larger than 10 MB */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
                 };
             };
             /** @description Invalid parameters */

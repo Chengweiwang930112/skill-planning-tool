@@ -1,0 +1,211 @@
+<h1 class="si-h3 mb-2">Skill catalogue</h1>
+<p class="text-secondary mb-6">
+  Employees can only be given skills from this catalogue, so every skill has exactly one name. Names
+  that differ only in case, spaces or punctuation, such as Node.js and NodeJS, count as the same
+  skill.
+</p>
+
+<div class="row g-6 mb-8">
+  <section class="col-lg-6">
+    <h2 class="si-h4 mb-4">Add a skill</h2>
+    <form class="d-flex align-items-end gap-4" (ngSubmit)="add()">
+      <div class="flex-grow-1">
+        <label class="form-label" for="new-skill-name">Name</label>
+        <input
+          id="new-skill-name"
+          name="name"
+          class="form-control"
+          autocomplete="off"
+          maxlength="100"
+          placeholder="e.g. Kubernetes"
+          [disabled]="adding()"
+          [ngModel]="newName()"
+          (ngModelChange)="newName.set($event)"
+        />
+      </div>
+      <button type="submit" class="btn btn-primary" [disabled]="!newName().trim() || adding()">
+        Add
+      </button>
+    </form>
+    @if (addError(); as message) {
+      <si-inline-notification
+        class="d-block mt-4"
+        severity="danger"
+        heading="The skill was not added."
+        [message]="message"
+      />
+    } @else if (added(); as skill) {
+      <p class="si-caption text-success mt-2 mb-0" role="status">Added {{ skill.name }}.</p>
+    }
+  </section>
+
+  <section class="col-lg-6">
+    <h2 class="si-h4 mb-4">Import skills</h2>
+    @if (importing(); as fileName) {
+      <div class="d-flex align-items-center gap-4 py-6 justify-content-center" role="status">
+        <si-loading-spinner />
+        <span>Importing {{ fileName }}…</span>
+      </div>
+    } @else {
+      <si-file-dropzone
+        accept=".csv,text/csv"
+        acceptText="Accepted file type: CSV with a name column"
+        [maxFileSize]="maxUploadBytes"
+        uploadDropText="Drop a CSV file here or click to choose one"
+        (filesAdded)="upload($event)"
+        (fileError)="rejectFile($event)"
+      />
+    }
+    @if (importError(); as message) {
+      <si-inline-notification
+        class="d-block mt-4"
+        severity="danger"
+        heading="The file could not be imported."
+        [message]="message"
+      />
+    } @else if (imported(); as result) {
+      <si-inline-notification
+        class="d-block mt-4"
+        [severity]="result.row_errors.length ? 'warning' : 'success'"
+        heading="Import finished."
+        [message]="importSummary(result)"
+      />
+      @if (result.row_errors.length) {
+        <ul class="si-caption mt-2 mb-0" aria-label="Skipped rows">
+          @for (error of result.row_errors; track error.row) {
+            <li>Row {{ error.row }}: {{ error.message }}</li>
+          }
+        </ul>
+      }
+    }
+  </section>
+</div>
+
+<section>
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-4 mb-4">
+    <h2 class="si-h4 mb-0">Skills</h2>
+    <si-search-bar
+      class="search"
+      placeholder="Search skills"
+      showIcon
+      [value]="q() ?? ''"
+      (searchChange)="search($event)"
+    />
+  </div>
+
+  @if (loadError(); as message) {
+    <si-inline-notification
+      severity="danger"
+      heading="The skills could not be loaded."
+      [message]="message"
+    />
+  } @else if (skills.value(); as result) {
+    @if (result.total === 0) {
+      <si-empty-state
+        icon="element-list"
+        [heading]="q() ? 'No skills match your search' : 'The catalogue is empty'"
+        [content]="q() ? 'Try a different name.' : 'Add a skill or import a CSV file of skills.'"
+      />
+    } @else {
+      <p class="text-secondary mb-4">
+        {{ result.total | number }} {{ result.total === 1 ? 'skill' : 'skills' }}
+      </p>
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th scope="col">Name</th>
+              <th scope="col" class="count text-end">Employees</th>
+              <th scope="col" class="actions"><span class="visually-hidden">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (skill of result.items; track skill.id) {
+              <tr>
+                @if (editing() === skill.id) {
+                  <td colspan="3">
+                    <form class="d-flex align-items-center gap-4" (ngSubmit)="rename(skill)">
+                      <input
+                        name="name"
+                        class="form-control"
+                        autocomplete="off"
+                        maxlength="100"
+                        [attr.aria-label]="'New name for ' + skill.name"
+                        [disabled]="renaming()"
+                        [ngModel]="editedName()"
+                        (ngModelChange)="editedName.set($event)"
+                      />
+                      <button type="submit" class="btn btn-primary" [disabled]="renaming()">
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-secondary"
+                        [disabled]="renaming()"
+                        (click)="cancelRename()"
+                      >
+                        Cancel
+                      </button>
+                    </form>
+                  </td>
+                } @else {
+                  <td>{{ skill.name }}</td>
+                  <td class="text-end">
+                    @if (skill.employee_count) {
+                      <a routerLink="/employees" [queryParams]="{ skill: skill.name }">
+                        {{ skill.employee_count | number }}
+                      </a>
+                    } @else {
+                      <span class="text-secondary">0</span>
+                    }
+                  </td>
+                  <td class="text-end text-nowrap">
+                    <button
+                      type="button"
+                      class="btn btn-circle btn-sm btn-tertiary element-edit"
+                      [attr.aria-label]="'Rename ' + skill.name"
+                      (click)="startRename(skill)"
+                    ></button>
+                    <button
+                      type="button"
+                      class="btn btn-circle btn-sm btn-tertiary element-delete"
+                      [attr.aria-label]="'Remove ' + skill.name"
+                      [title]="
+                        skill.employee_count
+                          ? 'Employees have this skill, so it cannot be removed'
+                          : 'Remove from the catalogue'
+                      "
+                      [disabled]="skill.employee_count > 0"
+                      (click)="remove(skill)"
+                    ></button>
+                  </td>
+                }
+              </tr>
+              @if (rowError()?.id === skill.id) {
+                <tr>
+                  <td colspan="3" class="border-top-0 pt-0">
+                    <span class="si-caption text-danger" role="alert">
+                      {{ rowError()?.message }}
+                    </span>
+                  </td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (result.total > pageSize) {
+        <si-pagination
+          class="mt-4"
+          navAriaLabel="Skill pages"
+          [currentPage]="result.page"
+          [pageSize]="pageSize"
+          [totalRowCount]="result.total"
+          (currentPageChange)="goToPage($event)"
+        />
+      }
+    }
+  } @else {
+    <si-loading-spinner />
+  }
+</section>

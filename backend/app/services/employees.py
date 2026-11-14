@@ -1,11 +1,11 @@
 from collections.abc import Sequence
 
-from sqlalchemy import Select, String, any_, delete, func, literal, literal_column, or_, select
-from sqlalchemy.dialects.postgresql import ARRAY, insert
+from sqlalchemy import Select, delete, func, literal_column, or_, select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute, selectinload
 
-from app.models import Employee, EmployeeSkill, ProficiencyLevel, Skill
+from app.models import Employee, EmployeeSkill, ProficiencyLevel, Skill, skill_key
 from app.schemas import EmployeeQuery, SkillLevelWrite
 
 SORTABLE: dict[str, InstrumentedAttribute[object]] = {
@@ -39,7 +39,7 @@ def _filtered(query: EmployeeQuery) -> Select[Employee]:
                 select(EmployeeSkill.employee_id)
                 .join(Skill)
                 .where(
-                    func.lower(Skill.name) == criterion.name.lower(),
+                    Skill.key == skill_key(criterion.name),
                     EmployeeSkill.level >= criterion.min_level,
                 )
             )
@@ -95,39 +95,30 @@ async def remove_skill(session: AsyncSession, employee_id: int, skill_id: int) -
     await session.commit()
 
 
+class UnknownSkillsError(Exception):
+    def __init__(self, skill_ids: list[int]) -> None:
+        super().__init__(f"Unknown skills: {', '.join(map(str, skill_ids))}")
+        self.skill_ids = skill_ids
+
+
 async def replace_skills(
     session: AsyncSession, employee_id: int, skills: list[SkillLevelWrite]
 ) -> None:
-    """Makes `skills` the employee's complete set of skills, in one transaction."""
-    if skills:
-        await session.execute(
-            insert(Skill)
-            .values([{"name": skill.name} for skill in skills])
-            .on_conflict_do_nothing(index_elements=[func.lower(Skill.name)])
-        )
-    names = literal([skill.name.lower() for skill in skills], ARRAY(String))
-    skill_ids = {
-        name: skill_id
-        for skill_id, name in await session.execute(
-            select(Skill.id, func.lower(Skill.name)).where(func.lower(Skill.name) == any_(names))
-        )
-    }
+    """Makes `skills` the employee's complete set of skills, in one transaction. Only
+    catalogue skills can be assigned; this never creates one."""
+    ids = [skill.skill_id for skill in skills]
+    known = set(await session.scalars(select(Skill.id).where(Skill.id.in_(ids))))
+    if unknown := sorted(set(ids) - known):
+        raise UnknownSkillsError(unknown)
+
     await session.execute(
         delete(EmployeeSkill).where(
-            EmployeeSkill.employee_id == employee_id,
-            EmployeeSkill.skill_id.not_in(skill_ids.values()),
+            EmployeeSkill.employee_id == employee_id, EmployeeSkill.skill_id.not_in(ids)
         )
     )
     if skills:
         statement = insert(EmployeeSkill).values(
-            [
-                {
-                    "employee_id": employee_id,
-                    "skill_id": skill_ids[s.name.lower()],
-                    "level": s.level,
-                }
-                for s in skills
-            ]
+            [{"employee_id": employee_id, "skill_id": s.skill_id, "level": s.level} for s in skills]
         )
         await session.execute(
             statement.on_conflict_do_update(

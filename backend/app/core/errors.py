@@ -30,7 +30,7 @@ def problem_response(description: str) -> dict[str, Any]:
     return {"model": ProblemDetail, "description": description}
 
 
-def _problem(
+def problem(
     status_code: int,
     detail: str | None = None,
     errors: list[InvalidParam] | None = None,
@@ -49,7 +49,7 @@ def _problem(
 
 async def _http_exception(_: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, HTTPException)
-    return _problem(exc.status_code, detail=exc.detail, headers=exc.headers)
+    return problem(exc.status_code, detail=exc.detail, headers=exc.headers)
 
 
 async def _validation_error(_: Request, exc: Exception) -> JSONResponse:
@@ -58,7 +58,7 @@ async def _validation_error(_: Request, exc: Exception) -> JSONResponse:
         InvalidParam(name=".".join(str(part) for part in e["loc"][1:]) or "body", reason=e["msg"])
         for e in exc.errors()
     ]
-    return _problem(
+    return problem(
         status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Invalid request parameters", errors=errors
     )
 

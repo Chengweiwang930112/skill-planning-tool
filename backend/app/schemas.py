@@ -98,10 +98,22 @@ SkillName = Annotated[
 ]
 
 
-class SkillCreate(BaseModel):
+class SkillWithUsage(SkillRead):
+    employee_count: int = Field(description="Employees who have the skill.", examples=[12])
+
+
+class SkillWrite(BaseModel):
     name: SkillName = Field(
-        description="Matched case-insensitively against existing skills; whitespace is collapsed."
+        description="Unique ignoring case, spaces and punctuation: Node.js and NodeJS clash."
     )
+
+
+class SkillImportResult(BaseModel):
+    rows_created: int = Field(examples=[24])
+    rows_existing: int = Field(
+        description="Names already in the catalogue or earlier in the file.", examples=[3]
+    )
+    row_errors: list["RowErrorRead"]
 
 
 class SkillAssignmentWrite(BaseModel):
@@ -109,7 +121,7 @@ class SkillAssignmentWrite(BaseModel):
 
 
 class SkillLevelWrite(BaseModel):
-    name: SkillName
+    skill_id: int = Field(description="A skill from the catalogue.", examples=[7])
     level: Level = Field(examples=["advanced"])
 
 
@@ -121,12 +133,10 @@ class EmployeeSkillsWrite(BaseModel):
 
     @field_validator("skills")
     @classmethod
-    def _names_are_unique(cls, skills: list[SkillLevelWrite]) -> list[SkillLevelWrite]:
-        seen: set[str] = set()
-        for skill in skills:
-            if skill.name.lower() in seen:
-                raise ValueError(f"{skill.name} is listed more than once")
-            seen.add(skill.name.lower())
+    def _skills_are_unique(cls, skills: list[SkillLevelWrite]) -> list[SkillLevelWrite]:
+        ids = [skill.skill_id for skill in skills]
+        if duplicates := sorted({i for i in ids if ids.count(i) > 1}):
+            raise ValueError(f"skills listed more than once: {', '.join(map(str, duplicates))}")
         return skills
 
 
@@ -159,7 +169,10 @@ class PageQuery(BaseModel):
 
 class SkillQuery(PageQuery):
     q: str | None = Field(
-        None, min_length=1, max_length=100, description="Case-insensitive part of the name."
+        None,
+        min_length=1,
+        max_length=100,
+        description="Part of the name, ignoring case, spaces and punctuation.",
     )
 
 

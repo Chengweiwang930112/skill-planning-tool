@@ -14,7 +14,7 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, validates
 from sqlalchemy.types import TypeDecorator
 
 
@@ -81,14 +81,25 @@ class Employee(Base):
     )
 
 
+def skill_key(name: str) -> str:
+    """What makes two skill names the same skill: case, spaces and punctuation do not
+    count, so Node.js, NodeJS and node js are one skill. + and # are spelled out first,
+    so that C, C++ and C# stay three skills."""
+    spelled = name.casefold().replace("+", "plus").replace("#", "sharp")
+    return "".join(character for character in spelled if character.isalnum())
+
+
 class Skill(Base):
     __tablename__ = "skill"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str]
+    key: Mapped[str] = mapped_column(unique=True)
 
-
-Index("uq_skill_name_lower", func.lower(Skill.name), unique=True)
+    @validates("name")
+    def _derive_key(self, _: str, name: str) -> str:
+        self.key = skill_key(name)
+        return name
 
 
 class EmployeeSkill(Base):

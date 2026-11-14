@@ -28,21 +28,13 @@
 }
 
 <form class="d-flex flex-wrap align-items-end gap-4" (ngSubmit)="search()">
-  <div class="name">
-    <label class="form-label" for="criterion-skill">Skill</label>
-    <input
-      id="criterion-skill"
-      name="skill"
-      class="form-control"
-      autocomplete="off"
-      placeholder="e.g. Kubernetes"
-      maxlength="100"
-      [siTypeahead]="suggestions"
-      typeaheadFullWidth
-      [disabled]="draft().length >= maxCriteria"
-      [(ngModel)]="newSkill"
-    />
-  </div>
+  <app-skill-picker
+    #skillPicker
+    class="name"
+    inputId="criterion-skill"
+    [disabled]="draft().length >= maxCriteria"
+    [exclude]="draftNames()"
+  />
   <div>
     <label class="form-label" for="criterion-level">Minimum level</label>
     <select id="criterion-level" name="level" class="form-select level" [(ngModel)]="newLevel">
@@ -57,13 +49,14 @@
   <button
     type="button"
     class="btn btn-secondary"
-    [disabled]="!newSkill.trim() || draft().length >= maxCriteria"
+    [disabled]="draft().length >= maxCriteria"
     (click)="add()"
   >
     Add skill
   </button>
   <button type="submit" class="btn btn-primary">Search</button>
 </form>
+<app-skill-picker-hint [picker]="skillPicker" />
 @if (draft().length >= maxCriteria) {
   <p class="si-caption text-secondary mt-2">At most {{ maxCriteria }} skills per search.</p>
 } @else if (pending() && criteria().length) {

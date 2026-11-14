@@ -27,53 +27,6 @@ async def create_skill(client: AsyncClient, name: str) -> Any:
     return response.json()
 
 
-async def test_creates_a_skill_with_normalised_whitespace(client: AsyncClient) -> None:
-    skill = await create_skill(client, "  Apache   Kafka ")
-
-    assert skill["name"] == "Apache Kafka"
-
-
-async def test_returns_the_existing_skill_regardless_of_case(
-    client: AsyncClient, session: AsyncSession
-) -> None:
-    existing = await create_skill(client, "Kubernetes")
-
-    response = await client.post(SKILLS, json={"name": "kubernetes"})
-
-    assert response.status_code == status.HTTP_200_OK
-    assert response.json() == existing
-    assert await session.scalar(select(func.count()).select_from(Skill)) == 1
-
-
-@pytest.mark.parametrize("name", ["", "   ", "x" * 101], ids=["empty", "blank", "too-long"])
-async def test_rejects_invalid_skill_names(client: AsyncClient, name: str) -> None:
-    response = await client.post(SKILLS, json={"name": name})
-
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
-    assert [error["name"] for error in response.json()["errors"]] == ["name"]
-
-
-async def test_lists_skills_alphabetically_ignoring_case(
-    client: AsyncClient, session: AsyncSession
-) -> None:
-    await persist(session, *(Skill(name=name) for name in ["python", "Angular", "Kubernetes"]))
-
-    page = (await client.get(SKILLS)).json()
-
-    assert [skill["name"] for skill in page["items"]] == ["Angular", "Kubernetes", "python"]
-    assert page["total"] == 3
-
-
-async def test_filters_skills_by_part_of_the_name(
-    client: AsyncClient, session: AsyncSession
-) -> None:
-    await persist(session, *(Skill(name=name) for name in ["TypeScript", "JavaScript", "Go"]))
-
-    page = (await client.get(SKILLS, params={"q": "script", "page_size": 1})).json()
-
-    assert ([skill["name"] for skill in page["items"]], page["total"]) == (["JavaScript"], 2)
-
-
 async def test_assigns_a_skill_then_changes_its_level(
     client: AsyncClient, session: AsyncSession
 ) -> None:
@@ -171,9 +124,8 @@ async def test_replaces_all_skills_in_one_request(
         skills_url(employee.id),
         json={
             "skills": [
-                {"name": "python", "level": "advanced"},
-                {"name": "kubernetes", "level": "expert"},
-                {"name": "Rust", "level": "beginner"},
+                {"skill_id": python.id, "level": "advanced"},
+                {"skill_id": k8s.id, "level": "expert"},
             ]
         },
     )
@@ -182,14 +134,11 @@ async def test_replaces_all_skills_in_one_request(
     assert [(s["skill"]["name"], s["level"]) for s in response.json()["skills"]] == [
         ("Kubernetes", "expert"),
         ("Python", "advanced"),
-        ("Rust", "beginner"),
     ]
     assert await employee_skills(client, employee.id) == [
         ("Kubernetes", "expert"),
         ("Python", "advanced"),
-        ("Rust", "beginner"),
     ]
-    assert await session.scalar(select(func.count()).select_from(Skill)) == 4
 
 
 async def test_replacing_leaves_unchanged_assignments_untouched(
@@ -207,7 +156,10 @@ async def test_replacing_leaves_unchanged_assignments_untouched(
     await client.put(
         skills_url(employee.id),
         json={
-            "skills": [{"name": "Go", "level": "advanced"}, {"name": "Python", "level": "expert"}]
+            "skills": [
+                {"skill_id": go.id, "level": "advanced"},
+                {"skill_id": python.id, "level": "expert"},
+            ]
         },
     )
 
@@ -227,20 +179,43 @@ async def test_replacing_with_nothing_removes_every_skill(
     assert await session.scalar(select(func.count()).select_from(EmployeeSkill)) == 0
 
 
+async def test_only_assigns_skills_from_the_catalogue(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    go = Skill(name="Go")
+    employee = make_employee({go: ProficiencyLevel.BEGINNER})
+    await persist(session, employee)
+
+    response = await client.put(
+        skills_url(employee.id),
+        json={
+            "skills": [
+                {"skill_id": go.id, "level": "expert"},
+                {"skill_id": 999999, "level": "expert"},
+            ]
+        },
+    )
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    assert response.json()["detail"] == "Unknown skills: 999999"
+    assert await employee_skills(client, employee.id) == [("Go", "beginner")]
+    assert await session.scalar(select(func.count()).select_from(Skill)) == 1
+
+
 @pytest.mark.parametrize(
     ("skills", "reason"),
     [
         (
-            [{"name": "Go", "level": "expert"}, {"name": "go", "level": "beginner"}],
+            [{"skill_id": 1, "level": "expert"}, {"skill_id": 1, "level": "beginner"}],
             "more than once",
         ),
-        ([{"name": "Go", "level": "guru"}], "must be one of"),
-        ([{"name": " ", "level": "expert"}], "at least 1 character"),
+        ([{"skill_id": 1, "level": "guru"}], "must be one of"),
+        ([{"name": "Go", "level": "expert"}], "Field required"),
     ],
-    ids=["duplicate", "level", "blank-name"],
+    ids=["duplicate", "level", "name-instead-of-id"],
 )
 async def test_rejects_an_invalid_skill_list(
-    client: AsyncClient, session: AsyncSession, skills: list[dict[str, str]], reason: str
+    client: AsyncClient, session: AsyncSession, skills: list[dict[str, object]], reason: str
 ) -> None:
     employee = make_employee({Skill(name="Go"): ProficiencyLevel.BEGINNER})
     await persist(session, employee)

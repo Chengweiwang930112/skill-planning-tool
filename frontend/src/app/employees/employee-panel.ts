@@ -9,29 +9,31 @@ import {
   linkedSignal,
   output,
   signal,
+  viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SiInlineNotificationComponent } from '@siemens/element-ng/inline-notification';
 import { SiLoadingSpinnerComponent } from '@siemens/element-ng/loading-spinner';
-import { SiTypeaheadDirective, TypeaheadOptionSource } from '@siemens/element-ng/typeahead';
-import { firstValueFrom, map } from 'rxjs';
-import type { Employee, Level, SkillPage } from '../api/models';
+import { firstValueFrom } from 'rxjs';
+import type { Employee, Level } from '../api/models';
 import { problemMessage } from '../api/problem';
 import { LEVELS } from '../shared/level';
+import { SkillPicker, SkillPickerHint } from '../shared/skill-picker';
 
 export interface DraftSkill {
+  id: number;
   name: string;
   level: Level;
 }
 
 function draftOf(employee: Employee): DraftSkill[] {
-  return employee.skills.map(({ skill, level }) => ({ name: skill.name, level }));
+  return employee.skills.map(({ skill, level }) => ({ id: skill.id, name: skill.name, level }));
 }
 
 function sameSkills(a: DraftSkill[], b: DraftSkill[]): boolean {
   const key = (skills: DraftSkill[]) =>
     skills
-      .map((s) => `${s.name.toLowerCase()}:${s.level}`)
+      .map((s) => `${s.id}:${s.level}`)
       .sort()
       .join();
   return key(a) === key(b);
@@ -45,7 +47,8 @@ function sameSkills(a: DraftSkill[], b: DraftSkill[]): boolean {
     FormsModule,
     SiInlineNotificationComponent,
     SiLoadingSpinnerComponent,
-    SiTypeaheadDirective,
+    SkillPicker,
+    SkillPickerHint,
   ],
   templateUrl: './employee-panel.html',
   styleUrl: './employee-panel.scss',
@@ -78,15 +81,9 @@ export class EmployeePanel {
   protected readonly saved = signal(false);
   protected readonly saveError = signal<string | undefined>(undefined);
 
-  protected newSkill = '';
+  protected readonly picker = viewChild(SkillPicker);
+  protected readonly draftNames = computed(() => this.draft().map((s) => s.name));
   protected newLevel: Level = 'intermediate';
-
-  protected readonly suggestions: TypeaheadOptionSource = (q: string) =>
-    this.http
-      .get<SkillPage>('/api/v1/skills', { params: q ? { q, page_size: 10 } : { page_size: 10 } })
-      .pipe(
-        map((page) => page.items.map((skill) => skill.name).filter((name) => !this.find(name))),
-      );
 
   constructor() {
     effect(() => {
@@ -96,26 +93,26 @@ export class EmployeePanel {
     });
   }
 
-  protected changeLevel(name: string, level: Level): void {
-    this.edit((skills) => skills.map((s) => (s.name === name ? { ...s, level } : s)));
+  protected changeLevel(id: number, level: Level): void {
+    this.edit((skills) => skills.map((s) => (s.id === id ? { ...s, level } : s)));
   }
 
-  protected remove(name: string): void {
-    this.edit((skills) => skills.filter((s) => s.name !== name));
+  protected remove(id: number): void {
+    this.edit((skills) => skills.filter((s) => s.id !== id));
   }
 
   protected add(): void {
-    const name = this.newSkill.trim().replace(/\s+/g, ' ');
-    if (!name) {
+    const picker = this.picker();
+    if (!picker?.validate() || !picker.skill) {
       return;
     }
+    const { id, name } = picker.skill;
     const level = this.newLevel;
-    this.newSkill = '';
-    const existing = this.find(name);
+    picker.clear();
     this.edit((skills) =>
-      existing
-        ? skills.map((s) => (s === existing ? { ...s, level } : s))
-        : [...skills, { name, level }],
+      skills.some((s) => s.id === id)
+        ? skills.map((s) => (s.id === id ? { ...s, level } : s))
+        : [...skills, { id, name, level }],
     );
   }
 
@@ -125,7 +122,7 @@ export class EmployeePanel {
     try {
       const employee = await firstValueFrom(
         this.http.put<Employee>(`/api/v1/employees/${this.employeeId()}/skills`, {
-          skills: this.draft(),
+          skills: this.draft().map(({ id, level }) => ({ skill_id: id, level })),
         }),
       );
       this.employee.value.set(employee);
@@ -140,10 +137,5 @@ export class EmployeePanel {
   private edit(change: (skills: DraftSkill[]) => DraftSkill[]): void {
     this.draft.update(change);
     this.saved.set(false);
-  }
-
-  private find(name: string): DraftSkill | undefined {
-    const key = name.trim().toLowerCase();
-    return this.draft().find((s) => s.name.toLowerCase() === key);
   }
 }

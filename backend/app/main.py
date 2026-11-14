@@ -2,6 +2,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.gzip import GZipMiddleware
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app import __version__
@@ -11,6 +12,8 @@ from app.api.imports import router as imports_router
 from app.api.skills import router as skills_router
 from app.core.config import Settings, get_settings
 from app.core.errors import register_error_handlers
+from app.core.frontend import SinglePageApp
+from app.core.limits import reject_oversized_requests
 
 OPENAPI_TAGS = [
     {"name": "employees", "description": "Employees and the skills assigned to them."},
@@ -42,10 +45,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
     register_error_handlers(app)
+    app.middleware("http")(reject_oversized_requests)
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
     app.include_router(employees_router, prefix=settings.api_v1_prefix)
     app.include_router(skills_router, prefix=settings.api_v1_prefix)
     app.include_router(imports_router, prefix=settings.api_v1_prefix)
     app.include_router(health_router)
+    # Mounted last, so that it only receives what no route matched.
+    if settings.static_dir:
+        app.mount("/", SinglePageApp(directory=settings.static_dir), name="frontend")
 
     return app
 

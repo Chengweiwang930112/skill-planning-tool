@@ -49,25 +49,32 @@ start() {
   echo "Frontend: http://localhost:4200       (log: $RUN_DIR/frontend.log)"
 }
 
+up() {
+  docker compose --profile app up --build --detach --wait
+  echo "Application: http://localhost:8080        (Swagger UI: http://localhost:8080/docs)"
+}
+
 stop() {
   stop_servers
-  docker compose down
+  docker compose --profile app down
 }
 
 clean() {
   stop_servers
-  docker compose down --volumes --remove-orphans
+  docker compose --profile app down --volumes --remove-orphans
   rm -rf "$RUN_DIR"
 }
 
 case "${1:-help}" in
   start) start ;;
+  up) up ;;
   stop) stop ;;
   restart) stop && start ;;
   clean) clean ;;
   *)
     echo "make start    start the database, apply migrations, run backend and frontend in the background"
-    echo "make stop     stop backend, frontend and the containers; data is kept"
+    echo "make up       build the image and run the database and the application as containers on :8080"
+    echo "make stop     stop backend, frontend and all containers; data is kept"
     echo "make restart  stop, then start"
     echo "make clean    stop, then delete containers, volumes with the database data and logs; images are kept"
     ;;

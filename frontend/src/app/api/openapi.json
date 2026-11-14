@@ -216,7 +216,7 @@
           "employees"
         ],
         "summary": "Replace all skills of an employee",
-        "description": "Sets the employee's complete set of skills in one transaction: listed skills are\nassigned at their level, creating catalogue entries for new names, and all others are\nremoved. Use this to save several edits at once; it either applies all or none.",
+        "description": "Sets the employee's complete set of skills in one transaction: listed skills are\nassigned at their level, all others are removed. Skills come from the catalogue\n(`GET /skills`); unknown ids are rejected. Either all changes apply or none.",
         "operationId": "replace_skills_api_v1_employees__employee_id__skills_put",
         "parameters": [
           {
@@ -413,8 +413,8 @@
         "tags": [
           "skills"
         ],
-        "summary": "List skills",
-        "description": "The skill catalogue, alphabetically; `q` narrows it down for autocompletion.",
+        "summary": "List the skill catalogue",
+        "description": "Alphabetically, with how many employees have each skill; `q` narrows the list down,\ne.g. for autocompletion, ignoring case, spaces and punctuation.",
         "operationId": "list_skills_api_v1_skills_get",
         "parameters": [
           {
@@ -459,10 +459,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Case-insensitive part of the name.",
+              "description": "Part of the name, ignoring case, spaces and punctuation.",
               "title": "Q"
             },
-            "description": "Case-insensitive part of the name."
+            "description": "Part of the name, ignoring case, spaces and punctuation."
           }
         ],
         "responses": {
@@ -471,7 +471,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_SkillRead_"
+                  "$ref": "#/components/schemas/Page_SkillWithUsage_"
                 }
               }
             }
@@ -492,15 +492,15 @@
         "tags": [
           "skills"
         ],
-        "summary": "Create a skill, or get the existing one",
-        "description": "Names are unique regardless of case: asking for `kubernetes` when `Kubernetes`\nexists returns the existing skill with 200 instead of creating a near-duplicate.",
+        "summary": "Add a skill",
+        "description": "Names must be unique ignoring case, spaces and punctuation, so that the catalogue\ndoes not end up with Node.js next to NodeJS.",
         "operationId": "create_skill_api_v1_skills_post",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SkillCreate"
+                "$ref": "#/components/schemas/SkillWrite"
               }
             }
           }
@@ -526,12 +526,190 @@
               }
             }
           },
+          "409": {
+            "description": "A skill with this name exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/skills/{skill_id}": {
+      "patch": {
+        "tags": [
+          "skills"
+        ],
+        "summary": "Rename a skill",
+        "description": "Every employee with the skill shows the new name.",
+        "operationId": "rename_skill_api_v1_skills__skill_id__patch",
+        "parameters": [
+          {
+            "name": "skill_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Skill Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkillWrite"
+              }
+            }
+          }
+        },
+        "responses": {
           "200": {
-            "description": "The skill already existed",
+            "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SkillRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Skill not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A skill with this name exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "skills"
+        ],
+        "summary": "Remove a skill nobody has",
+        "operationId": "delete_skill_api_v1_skills__skill_id__delete",
+        "parameters": [
+          {
+            "name": "skill_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Skill Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Skill not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Employees have the skill",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/skills/import": {
+      "post": {
+        "tags": [
+          "skills"
+        ],
+        "summary": "Add skills from a CSV file",
+        "description": "Adds every name not yet in the catalogue; importing the same file again changes\nnothing. Meant for moving an existing list of skills in at once.",
+        "operationId": "import_skills_api_v1_skills_import_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_skills_api_v1_skills_import_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkillImportResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "File larger than 10 MB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
                 }
               }
             }
@@ -770,6 +948,21 @@
           "file"
         ],
         "title": "Body_create_import_api_v1_imports_post"
+      },
+      "Body_import_skills_api_v1_skills_import_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "description": "CSV with a `name` column; UTF-8 or Windows-1252."
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_import_skills_api_v1_skills_import_post"
       },
       "EmployeeRead": {
         "properties": {
@@ -1260,11 +1453,11 @@
         ],
         "title": "Page[ImportSummary]"
       },
-      "Page_SkillRead_": {
+      "Page_SkillWithUsage_": {
         "properties": {
           "items": {
             "items": {
-              "$ref": "#/components/schemas/SkillRead"
+              "$ref": "#/components/schemas/SkillWithUsage"
             },
             "type": "array",
             "title": "Items"
@@ -1299,7 +1492,7 @@
           "page",
           "page_size"
         ],
-        "title": "Page[SkillRead]"
+        "title": "Page[SkillWithUsage]"
       },
       "ProblemDetail": {
         "properties": {
@@ -1472,34 +1665,47 @@
         ],
         "title": "SkillAssignmentWrite"
       },
-      "SkillCreate": {
+      "SkillImportResult": {
         "properties": {
-          "name": {
-            "type": "string",
-            "maxLength": 100,
-            "minLength": 1,
-            "title": "Name",
-            "description": "Matched case-insensitively against existing skills; whitespace is collapsed.",
+          "rows_created": {
+            "type": "integer",
+            "title": "Rows Created",
             "examples": [
-              "Kubernetes"
+              24
             ]
+          },
+          "rows_existing": {
+            "type": "integer",
+            "title": "Rows Existing",
+            "description": "Names already in the catalogue or earlier in the file.",
+            "examples": [
+              3
+            ]
+          },
+          "row_errors": {
+            "items": {
+              "$ref": "#/components/schemas/RowErrorRead"
+            },
+            "type": "array",
+            "title": "Row Errors"
           }
         },
         "type": "object",
         "required": [
-          "name"
+          "rows_created",
+          "rows_existing",
+          "row_errors"
         ],
-        "title": "SkillCreate"
+        "title": "SkillImportResult"
       },
       "SkillLevelWrite": {
         "properties": {
-          "name": {
-            "type": "string",
-            "maxLength": 100,
-            "minLength": 1,
-            "title": "Name",
+          "skill_id": {
+            "type": "integer",
+            "title": "Skill Id",
+            "description": "A skill from the catalogue.",
             "examples": [
-              "Kubernetes"
+              7
             ]
           },
           "level": {
@@ -1518,7 +1724,7 @@
         },
         "type": "object",
         "required": [
-          "name",
+          "skill_id",
           "level"
         ],
         "title": "SkillLevelWrite"
@@ -1546,6 +1752,58 @@
           "name"
         ],
         "title": "SkillRead"
+      },
+      "SkillWithUsage": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "examples": [
+              7
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "examples": [
+              "Kubernetes"
+            ]
+          },
+          "employee_count": {
+            "type": "integer",
+            "title": "Employee Count",
+            "description": "Employees who have the skill.",
+            "examples": [
+              12
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "employee_count"
+        ],
+        "title": "SkillWithUsage"
+      },
+      "SkillWrite": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "description": "Unique ignoring case, spaces and punctuation: Node.js and NodeJS clash.",
+            "examples": [
+              "Kubernetes"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "SkillWrite"
       }
     }
   },

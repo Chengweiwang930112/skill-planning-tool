@@ -33,7 +33,7 @@
 
       @if (draft().length) {
         <ul class="list-unstyled d-flex flex-column gap-2 mb-6">
-          @for (skill of draft(); track skill.name) {
+          @for (skill of draft(); track skill.id) {
             <li class="d-flex align-items-center gap-4">
               <span class="flex-grow-1">{{ skill.name }}</span>
               <select
@@ -41,7 +41,7 @@
                 class="form-select level"
                 [attr.aria-label]="'Level of ' + skill.name"
                 [disabled]="saving()"
-                (change)="changeLevel(skill.name, $any(level.value))"
+                (change)="changeLevel(skill.id, $any(level.value))"
               >
                 @for (option of levels; track option) {
                   <option [value]="option" [selected]="option === skill.level">
@@ -54,7 +54,7 @@
                 class="btn btn-circle btn-sm btn-tertiary element-delete"
                 [attr.aria-label]="'Remove ' + skill.name"
                 [disabled]="saving()"
-                (click)="remove(skill.name)"
+                (click)="remove(skill.id)"
               ></button>
             </li>
           }
@@ -64,21 +64,14 @@
       }
 
       <form class="d-flex flex-wrap align-items-end gap-4" (ngSubmit)="add()">
-        <div class="flex-grow-1">
-          <label class="form-label" for="new-skill">Add a skill</label>
-          <input
-            id="new-skill"
-            name="skill"
-            class="form-control"
-            autocomplete="off"
-            placeholder="e.g. Kubernetes"
-            maxlength="100"
-            [siTypeahead]="suggestions"
-            typeaheadFullWidth
-            [disabled]="saving()"
-            [(ngModel)]="newSkill"
-          />
-        </div>
+        <app-skill-picker
+          #skillPicker
+          class="flex-grow-1"
+          label="Add a skill"
+          inputId="new-skill"
+          [disabled]="saving()"
+          [exclude]="draftNames()"
+        />
         <div>
           <label class="form-label" for="new-level">Level</label>
           <select
@@ -93,10 +86,9 @@
             }
           </select>
         </div>
-        <button type="submit" class="btn btn-secondary" [disabled]="!newSkill.trim() || saving()">
-          Add
-        </button>
+        <button type="submit" class="btn btn-secondary" [disabled]="saving()">Add</button>
       </form>
+      <app-skill-picker-hint [picker]="skillPicker" />
     </section>
   </div>
 

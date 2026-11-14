@@ -5,8 +5,8 @@ import {
   TestRequest,
 } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { firstValueFrom, Observable } from 'rxjs';
-import type { Employee, SkillPage } from '../api/models';
+import { provideRouter } from '@angular/router';
+import type { Employee, Skill, SkillPage } from '../api/models';
 import { EmployeePanel } from './employee-panel';
 
 const anna: Employee = {
@@ -25,6 +25,13 @@ const anna: Employee = {
   ],
 };
 
+const CATALOGUE: Skill[] = [
+  { id: 9, name: 'Apache Kafka' },
+  { id: 2, name: 'Kubernetes' },
+  { id: 1, name: 'Python' },
+  { id: 5, name: 'Terraform' },
+];
+
 describe('EmployeePanel', () => {
   let fixture: ComponentFixture<EmployeePanel>;
   let http: HttpTestingController;
@@ -33,7 +40,7 @@ describe('EmployeePanel', () => {
 
   beforeEach(async () => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
     http = TestBed.inject(HttpTestingController);
     fixture = TestBed.createComponent(EmployeePanel);
@@ -53,13 +60,21 @@ describe('EmployeePanel', () => {
 
   const view = () => fixture.nativeElement as HTMLElement;
 
-  /** Answers the requests the typeahead makes on its own, e.g. as soon as it renders. */
+  /** Answers the typeahead's searches like the API does: by part of the name. */
   function flushSuggestions(): void {
-    const none: SkillPage = { items: [], total: 0, page: 1, page_size: 10 };
-    http
-      .match((r) => r.url === '/api/v1/skills' && r.method === 'GET')
-      .filter((r) => !r.cancelled)
-      .forEach((r) => r.flush(none));
+    for (const request of http.match((r) => r.url === '/api/v1/skills' && r.method === 'GET')) {
+      if (request.cancelled) {
+        continue;
+      }
+      const q = (request.request.params.get('q') ?? '').toLowerCase();
+      const items = CATALOGUE.filter((skill) => skill.name.toLowerCase().includes(q));
+      request.flush({
+        items: items.map((skill) => ({ ...skill, employee_count: 1 })),
+        total: items.length,
+        page: 1,
+        page_size: 10,
+      } satisfies SkillPage);
+    }
   }
 
   /** Waits for a request without awaiting stability, which would need its response. */
@@ -116,6 +131,8 @@ describe('EmployeePanel', () => {
     const input = view().querySelector<HTMLInputElement>('#new-skill')!;
     input.value = name;
     input.dispatchEvent(new Event('input'));
+    await settle();
+    await settle();
     const select = view().querySelector<HTMLSelectElement>('#new-level')!;
     select.value = level;
     select.dispatchEvent(new Event('change'));
@@ -148,7 +165,7 @@ describe('EmployeePanel', () => {
 
   it('saves all edits in one request', async () => {
     await setLevel('Python', 'advanced');
-    await add('  Apache   Kafka ', 'beginner');
+    await add('apache kafka', 'beginner');
     button('Save').click();
     await settle();
 
@@ -156,9 +173,9 @@ describe('EmployeePanel', () => {
     const save = await request('PUT', '/api/v1/employees/1/skills');
     expect(save.request.body).toEqual({
       skills: [
-        { name: 'Kubernetes', level: 'expert' },
-        { name: 'Python', level: 'advanced' },
-        { name: 'Apache Kafka', level: 'beginner' },
+        { skill_id: 2, level: 'expert' },
+        { skill_id: 1, level: 'advanced' },
+        { skill_id: 9, level: 'beginner' },
       ],
     });
     const stored: Employee = {
@@ -215,32 +232,21 @@ describe('EmployeePanel', () => {
     http.expectNone({ method: 'PUT', url: '/api/v1/employees/1/skills' });
   });
 
-  it('suggests catalogue skills that are not in the list yet', async () => {
-    const panel = fixture.componentInstance as unknown as {
-      suggestions: (q: string) => Observable<string[]>;
-    };
-    const result = firstValueFrom(panel.suggestions('o'));
+  it('only adds skills from the catalogue', async () => {
+    await add('Cobol', 'expert');
 
-    const search = await request('GET', '/api/v1/skills', (params) => params.startsWith('q='));
-    expect(search.request.params.toString()).toBe('q=o&page_size=10');
-    search.flush({
-      items: [
-        { id: 3, name: 'Go' },
-        { id: 1, name: 'Python' },
-      ],
-      total: 2,
-      page: 1,
-      page_size: 10,
-    } satisfies SkillPage);
-
-    expect(await result).toEqual(['Go']);
+    expect(view().querySelector('[role=alert]')?.textContent).toContain(
+      '“Cobol” is not in the skill catalogue.',
+    );
+    expect(shownSkills()).toEqual(['Kubernetes expert', 'Python beginner']);
+    expect(button('Save').disabled).toBe(true);
   });
 });
 
 describe('EmployeePanel without data', () => {
   it('shows why the employee could not be loaded', async () => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
     const http = TestBed.inject(HttpTestingController);
     const fixture = TestBed.createComponent(EmployeePanel);

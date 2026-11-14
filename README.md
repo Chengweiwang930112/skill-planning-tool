@@ -4,10 +4,11 @@ An internal tool for team leads: import employees from a CSV, keep track of
 their skills and proficiency levels, and answer questions such as *"who knows
 Kubernetes at an advanced level?"* without asking around in chat.
 
-> **Status: milestone M9 — all four features are complete** in the backend and
-> the frontend: employee import, employee overview, skill assignment and skill
-> search. Containers (M10) and CI/CD (M11) follow; see [Roadmap](#roadmap). Each
-> milestone is a self-contained commit with its own tests.
+> **Status: milestone M10 — container images.** All four features are complete
+> in the backend and the frontend — employee import, employee overview, skill
+> assignment and skill search — and both ship as container images. CI/CD (M11)
+> follows; see [Roadmap](#roadmap). Each milestone is a self-contained commit
+> with its own tests.
 
 ## Tech stack
 
@@ -26,6 +27,7 @@ Kubernetes at an advanced level?"* without asking around in chat.
 │   └── migrations/   Alembic migrations
 ├── frontend/         Angular application (npm project)
 ├── docker/postgres/  database init script (creates the test database)
+├── Dockerfile        the application image (API and frontend)
 ├── samples/          CSV files to try the import with
 ├── scripts/          dev.ps1 / dev.sh behind the Makefile
 └── docker-compose.yml
@@ -48,7 +50,8 @@ are shipped as separate container images.
 
 ```bash
 make start     # database, migrations, then backend and frontend in the background
-make stop      # stop backend, frontend and the containers (data is kept)
+make up        # or: everything as containers, built from the image, on :8080
+make stop      # stop backend, frontend and all containers (data is kept)
 make restart
 make clean     # stop, then delete containers, volumes (database data) and logs
 ```
@@ -113,6 +116,76 @@ OpenAPI schema. After changing the API, regenerate them with
 `npm run api:types` (needs `uv`, not a running backend); a type error in the
 frontend then shows every place the change affects.
 
+## Running in containers
+
+```bash
+make up      # docker compose --profile app up --build --detach --wait
+make stop    # stops these containers along with everything else
+```
+
+This builds the image and starts the database, a one-off `migrate` container
+(`alembic upgrade head`) and the application. Port 8080 differs from the
+development servers, so both can run at once; Swagger UI is at
+<http://localhost:8080/docs>. `make stop` and `make clean` stop these
+containers too.
+
+The application is **one image** (`Dockerfile` at the repository root): the
+API and the frontend it serves, so there is one service to deploy and scale.
+The image is built in three stages — the frontend with Node.js, the backend's
+dependencies from `uv.lock` without development tools, and a
+`python:3.12-slim` runtime with only the virtual environment, the code and the
+built frontend — and runs one uvicorn process as a non-root user on port 8000.
+
+FastAPI serves the frontend itself rather than putting nginx in the same
+container, which would need a process supervisor:
+
+- Paths that are not files get `index.html`, so links into the app work, but
+  unknown paths under `/api/` stay `404` problem details.
+- Files with a content hash in their name are cached for a year, everything
+  else is revalidated; responses are gzip-compressed.
+- Requests larger than 12 MB are refused by their `Content-Length` before the
+  body is read, just above the import's 10 MB limit.
+
+Deploying to ECS:
+
+- **Migrations run as their own task** before a deployment (the `migrate`
+  command), not when the application starts: several tasks starting at once
+  would race to migrate the same database.
+- Configure the application through `APP_DATABASE_URL` (from Secrets Manager);
+  the image defaults to `APP_ENVIRONMENT=production`, which hides Swagger UI.
+- Health checks: `/healthz` (liveness) and `/readyz` (database reachable).
+- One server process per container; scale by running more tasks.
+
+## Skill catalogue
+
+Skills come from one managed list, so the same skill is never stored under two
+spellings. The catalogue page (`/skills`) adds, renames and removes skills, and
+imports a CSV file with a `name` column (`samples/skills.csv` has 44 to start
+with). Everywhere else, skills can only be chosen from the catalogue: the skill
+inputs on the employee panel and the search page accept a suggestion, never
+free text.
+
+- **Names are unique ignoring case, spaces and punctuation**, so `Node.js`,
+  `nodejs` and `Node JS` are one skill. `+` and `#` count as letters (`plus`,
+  `sharp`), which keeps `C`, `C++` and `C#` apart. The comparison key is stored
+  in `skill.key` with a unique index, so two concurrent requests cannot create
+  the same skill twice.
+- **Renaming** changes the name for everyone who has the skill; renaming into
+  another skill's name is refused rather than merging the two.
+- **Removing** is only possible while nobody has the skill.
+- **Importing** adds the names that are new and leaves existing ones alone, so
+  importing the same file again changes nothing; over-long names are reported
+  per row.
+
+| Endpoint                            | Does                                                          |
+| ----------------------------------- | ------------------------------------------------------------- |
+| `GET /api/v1/skills?q=`             | list, with how many employees have each skill                 |
+| `POST /api/v1/skills`               | add; `409` names the existing skill on a clash                |
+| `PATCH /api/v1/skills/{id}`         | rename; `409` on a clash                                      |
+| `DELETE /api/v1/skills/{id}`        | remove; `409` while employees have it                         |
+| `POST /api/v1/skills/import`        | add the names from a CSV file                                 |
+| `PUT /api/v1/employees/{id}/skills` | set an employee's skills by `skill_id`; unknown ids are `422` |
+
 ## Searching by skill
 
 "Who knows Kubernetes at an advanced level?" is a filter on the employee list:
@@ -125,7 +198,7 @@ GET /api/v1/employees?skill=kubernetes:advanced
 `advanced` also finds experts; `name` alone matches any level. Repeat `skill`
 to require several skills at once, e.g.
 `?skill=kubernetes:advanced&skill=python:intermediate`. Skill names are matched
-ignoring case, a misspelt level is rejected rather than matching nobody, and
+like in the catalogue, ignoring case, spaces and punctuation, a misspelt level is rejected rather than matching nobody, and
 the filter combines with `q`, `department`, sorting and paging.
 
 Levels are stored as integers (1 = beginner … 4 = expert), so "or higher" is a
@@ -173,6 +246,7 @@ The files in `samples/` cover these cases:
 | `employees-excel-de.csv`     | a German Excel export: Windows-1252, `;`, CRLF, `DD.MM.YYYY` |
 | `employees-with-errors.csv`  | one example of each row error next to valid rows             |
 | `employees-20000.csv`        | 20,000 fictional employees, for trying the import at volume  |
+| `skills.csv`                 | 44 skills for the catalogue, imported on the `/skills` page  |
 
 `employees-20000.csv` is generated and can be recreated byte for byte, or at
 another size: `cd backend && uv run python -m scripts.generate_employees 20000 ../samples/employees-20000.csv`.
@@ -235,8 +309,9 @@ from `docker compose up -d db`.
 
 **M8 — Skill assignment**
 - Employee detail in a side panel, opened from the overview.
-- Add a skill with autocompletion from the catalogue, creating it if it does
-  not exist yet; choose or change its level; remove it.
+- Add a skill chosen from the catalogue's suggestions (free text is not
+  accepted, see [Skill catalogue](#skill-catalogue)); choose or change its
+  level; remove it.
 - Edits are collected in a draft and saved together with **Save**, in one
   request (`PUT /employees/{id}/skills`) that applies all of them or none;
   **Exit** leaves without saving.

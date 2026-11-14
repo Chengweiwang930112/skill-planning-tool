@@ -20,4 +20,6 @@ export type ImportStatus = ImportSummary['status'];
 export type RowError = ImportRecord['row_errors'][number];
 
 export type Skill = Schemas['SkillRead'];
-export type SkillPage = Schemas['Page_SkillRead_'];
+export type SkillWithUsage = Schemas['SkillWithUsage'];
+export type SkillPage = Schemas['Page_SkillWithUsage_'];
+export type SkillImportResult = Schemas['SkillImportResult'];

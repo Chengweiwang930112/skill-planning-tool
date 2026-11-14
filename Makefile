@@ -7,7 +7,7 @@ DEV := bash scripts/dev.sh
 endif
 
 .DEFAULT_GOAL := help
-.PHONY: help start stop restart clean
+.PHONY: help start up stop restart clean
 
-help start stop restart clean:
+help start up stop restart clean:
 	@$(DEV) $@

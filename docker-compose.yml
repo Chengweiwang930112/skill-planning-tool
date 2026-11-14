@@ -16,5 +16,37 @@ services:
       timeout: 3s
       retries: 15
 
+  # The containerised application; only started with `docker compose --profile app up`,
+  # while `make start` runs just the database.
+  migrate:
+    profiles: [app]
+    build: .
+    image: skill-planning
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      APP_DATABASE_URL: postgresql+asyncpg://skills:skills@db:5432/skills
+    depends_on:
+      db:
+        condition: service_healthy
+
+  app:
+    profiles: [app]
+    build: .
+    image: skill-planning
+    environment:
+      APP_DATABASE_URL: postgresql+asyncpg://skills:skills@db:5432/skills
+      # The image defaults to production, which hides Swagger UI; show it locally.
+      APP_ENVIRONMENT: local
+    ports:
+      - "8080:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
 volumes:
   db-data:

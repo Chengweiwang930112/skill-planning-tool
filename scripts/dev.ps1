@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('help', 'start', 'stop', 'restart', 'clean')]
+    [ValidateSet('help', 'start', 'up', 'stop', 'restart', 'clean')]
     [string]$Command = 'help'
 )
 
@@ -83,26 +83,35 @@ function Start-All {
     Write-Host 'Frontend: http://localhost:4200       (log: .run\frontend.log)' -ForegroundColor Green
 }
 
+function Start-Containers {
+    # Builds the image, then starts the database, the migration and the application;
+    # --wait returns once the application reports ready.
+    Invoke-Step 'docker compose --profile app up --build --detach --wait'
+    Write-Host 'Application: http://localhost:8080        (Swagger UI: http://localhost:8080/docs)' -ForegroundColor Green
+}
+
 function Stop-All {
     Stop-Servers
-    Invoke-Step 'docker compose down'
+    Invoke-Step 'docker compose --profile app down'
 }
 
 function Clear-All {
     Stop-Servers
-    Invoke-Step 'docker compose down --volumes --remove-orphans'
+    Invoke-Step 'docker compose --profile app down --volumes --remove-orphans'
     if (Test-Path $RunDir) { Remove-Item -Recurse -Force $RunDir }
 }
 
 try {
     switch ($Command) {
         'start' { Start-All }
+        'up' { Start-Containers }
         'stop' { Stop-All }
         'restart' { Stop-All; Start-All }
         'clean' { Clear-All }
         default {
             Write-Host 'make start    start the database, apply migrations, run backend and frontend in the background'
-            Write-Host 'make stop     stop backend, frontend and the containers; data is kept'
+            Write-Host 'make up       build the image and run the database and the application as containers on :8080'
+            Write-Host 'make stop     stop backend, frontend and all containers; data is kept'
             Write-Host 'make restart  stop, then start'
             Write-Host 'make clean    stop, then delete containers, volumes with the database data and logs; images are kept'
         }

@@ -14,6 +14,7 @@ describe('App', () => {
     expect(links.map((link) => [link.textContent?.trim(), link.getAttribute('href')])).toEqual([
       ['Employees', '/employees'],
       ['Skill search', '/search'],
+      ['Skills', '/skills'],
       ['Import', '/imports'],
     ]);
   });

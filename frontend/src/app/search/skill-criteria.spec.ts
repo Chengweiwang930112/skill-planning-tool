@@ -1,10 +1,12 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { firstValueFrom, Observable } from 'rxjs';
+import { provideRouter } from '@angular/router';
 import type { SkillPage } from '../api/models';
 import { Criterion } from '../shared/criteria';
 import { MAX_CRITERIA, SkillCriteria } from './skill-criteria';
+
+const CATALOGUE = ['Apache Kafka', 'Go', 'Kubernetes', 'Python'];
 
 describe('SkillCriteria', () => {
   let fixture: ComponentFixture<SkillCriteria>;
@@ -17,18 +19,26 @@ describe('SkillCriteria', () => {
   }
 
   async function settle(): Promise<void> {
-    const none: SkillPage = { items: [], total: 0, page: 1, page_size: 10 };
-    http
-      .match((r) => r.url === '/api/v1/skills')
-      .filter((r) => !r.cancelled)
-      .forEach((r) => r.flush(none));
+    for (const request of http.match((r) => r.url === '/api/v1/skills')) {
+      if (request.cancelled) {
+        continue;
+      }
+      const q = (request.request.params.get('q') ?? '').toLowerCase();
+      const names = CATALOGUE.filter((name) => name.toLowerCase().includes(q));
+      request.flush({
+        items: names.map((name, id) => ({ id, name, employee_count: 0 })),
+        total: names.length,
+        page: 1,
+        page_size: 10,
+      } satisfies SkillPage);
+    }
     await new Promise((resolve) => setTimeout(resolve));
     TestBed.tick();
   }
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
     http = TestBed.inject(HttpTestingController);
     fixture = TestBed.createComponent(SkillCriteria);
@@ -57,6 +67,8 @@ describe('SkillCriteria', () => {
     const input = view().querySelector<HTMLInputElement>('#criterion-skill')!;
     input.value = name;
     input.dispatchEvent(new Event('input'));
+    await settle();
+    await settle();
     const select = view().querySelector<HTMLSelectElement>('#criterion-level')!;
     select.value = level;
     select.dispatchEvent(new Event('change'));
@@ -68,10 +80,10 @@ describe('SkillCriteria', () => {
     await settle();
   }
 
-  it('searches for a typed skill with one click, at advanced or higher by default', async () => {
+  it('searches for a typed catalogue skill with one click, at advanced by default', async () => {
     await render([]);
 
-    await type('  Apache   Kafka ', 'advanced');
+    await type('apache kafka', 'advanced');
     await click('Search');
 
     expect(searches).toEqual([[{ name: 'Apache Kafka', level: 'advanced' }]]);
@@ -152,25 +164,30 @@ describe('SkillCriteria', () => {
     expect(view().textContent).toContain('At most 10 skills per search.');
   });
 
-  it('suggests catalogue skills that are not listed yet', async () => {
+  it('never searches for a skill that is not in the catalogue', async () => {
     await render([{ name: 'Python' }]);
-    const component = fixture.componentInstance as unknown as {
-      suggestions: (q: string) => Observable<string[]>;
-    };
-    const result = firstValueFrom(component.suggestions('o'));
 
-    http
-      .expectOne((r) => r.url === '/api/v1/skills' && r.params.get('q') === 'o')
-      .flush({
-        items: [
-          { id: 1, name: 'Go' },
-          { id: 2, name: 'python' },
-        ],
-        total: 2,
-        page: 1,
-        page_size: 10,
-      } satisfies SkillPage);
+    await type('Cobol', '');
+    await click('Search');
+    await click('Add skill');
 
-    expect(await result).toEqual(['Go']);
+    expect(searches).toEqual([]);
+    expect(shownCriteria()).toEqual(['Python ']);
+    expect(view().querySelector('[role=alert]')?.textContent).toContain(
+      '“Cobol” is not in the skill catalogue.',
+    );
+    expect(view().querySelector('[role=alert] a')?.getAttribute('href')).toBe('/skills');
+  });
+
+  it('asks to choose a suggestion for partly typed names', async () => {
+    await render([]);
+
+    await type('kube', '');
+    await click('Search');
+
+    expect(searches).toEqual([]);
+    expect(view().querySelector('[role=alert]')?.textContent).toContain(
+      'Choose a skill from the suggestions.',
+    );
   });
 });
