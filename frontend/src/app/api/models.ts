@@ -18,3 +18,6 @@ export type ImportSummary = Schemas['ImportSummary'];
 export type ImportPage = Schemas['Page_ImportSummary_'];
 export type ImportStatus = ImportSummary['status'];
 export type RowError = ImportRecord['row_errors'][number];
+
+export type Skill = Schemas['SkillRead'];
+export type SkillPage = Schemas['Page_SkillRead_'];

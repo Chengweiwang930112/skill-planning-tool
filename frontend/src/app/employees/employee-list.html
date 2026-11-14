@@ -1,102 +1,122 @@
-<div class="d-flex flex-wrap align-items-center justify-content-between gap-4 mb-6">
-  <h1 class="si-h3 mb-0">Employees</h1>
-  <si-search-bar
-    class="search"
-    placeholder="Search by name, email or employee number"
-    showIcon
-    [value]="q() ?? ''"
-    (searchChange)="search($event)"
-  />
-</div>
-
-@if (error(); as message) {
-  <si-inline-notification
-    severity="danger"
-    heading="The employees could not be loaded."
-    [message]="message"
-  />
-  <button type="button" class="btn btn-secondary mt-4" (click)="employees.reload()">
-    Try again
-  </button>
-} @else if (employees.value(); as result) {
-  @if (result.total === 0) {
-    <si-empty-state
-      icon="element-user-group"
-      [heading]="q() ? 'No employees match your search' : 'No employees yet'"
-      [content]="
-        q()
-          ? 'Try a different name, email or employee number.'
-          : 'Import a CSV file to add employees.'
-      "
-    >
-      @if (!q()) {
-        <a class="btn btn-primary" routerLink="/imports">Import employees</a>
-      }
-    </si-empty-state>
-  } @else {
-    <p class="text-secondary mb-4">
-      {{ result.total }} {{ result.total === 1 ? 'employee' : 'employees' }}
-    </p>
-    <div class="table-responsive" [class.reloading]="employees.isLoading()">
-      <table class="table table-hover align-middle">
-        <thead>
-          <tr>
-            @for (column of columns; track column.label) {
-              @if (column.sort; as field) {
-                <th scope="col" [attr.aria-sort]="sortDirection(field)">
-                  <button type="button" class="sort-button" (click)="sortBy(field)">
-                    {{ column.label }}
-                    @switch (sortDirection(field)) {
-                      @case ('ascending') {
-                        <i class="icon element-sort-up" aria-hidden="true"></i>
-                      }
-                      @case ('descending') {
-                        <i class="icon element-sort-down" aria-hidden="true"></i>
-                      }
-                    }
-                  </button>
-                </th>
-              } @else {
-                <th scope="col">{{ column.label }}</th>
-              }
-            }
-          </tr>
-        </thead>
-        <tbody>
-          @for (employee of result.items; track employee.id) {
-            <tr>
-              <td>
-                <div>{{ employee.last_name }}, {{ employee.first_name }}</div>
-                <div class="si-caption text-secondary">{{ employee.email }}</div>
-              </td>
-              <td>{{ employee.employee_number }}</td>
-              <td>{{ employee.department }}</td>
-              <td>{{ employee.job_title }}</td>
-              <td>{{ employee.location }}</td>
-              <td>
-                <div class="d-flex flex-wrap gap-2">
-                  @for (assignment of employee.skills; track assignment.skill.id) {
-                    <si-badge [type]="levelBadge[assignment.level]">
-                      {{ assignment.skill.name }} · {{ assignment.level }}
-                    </si-badge>
-                  }
-                </div>
-              </td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    </div>
-    @if (result.total > pageSize) {
-      <si-pagination
-        class="mt-4"
-        [currentPage]="result.page"
-        [pageSize]="pageSize"
-        [totalRowCount]="result.total"
-        (currentPageChange)="goToPage($event)"
+<si-side-panel mode="over" [collapsed]="!employee()" (closed)="closePanel()">
+  <div>
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-4 mb-6">
+      <h1 class="si-h3 mb-0">Employees</h1>
+      <si-search-bar
+        class="search"
+        placeholder="Search by name, email or employee number"
+        showIcon
+        [value]="q() ?? ''"
+        (searchChange)="search($event)"
       />
+    </div>
+
+    @if (error(); as message) {
+      <si-inline-notification
+        severity="danger"
+        heading="The employees could not be loaded."
+        [message]="message"
+      />
+      <button type="button" class="btn btn-secondary mt-4" (click)="employees.reload()">
+        Try again
+      </button>
+    } @else if (employees.value(); as result) {
+      @if (result.total === 0) {
+        <si-empty-state
+          icon="element-user-group"
+          [heading]="q() ? 'No employees match your search' : 'No employees yet'"
+          [content]="
+            q()
+              ? 'Try a different name, email or employee number.'
+              : 'Import a CSV file to add employees.'
+          "
+        >
+          @if (!q()) {
+            <a class="btn btn-primary" routerLink="/imports">Import employees</a>
+          }
+        </si-empty-state>
+      } @else {
+        <p class="text-secondary mb-4">
+          {{ result.total }} {{ result.total === 1 ? 'employee' : 'employees' }}
+        </p>
+        <div class="table-responsive" [class.reloading]="employees.isLoading()">
+          <table class="table table-hover align-middle">
+            <thead>
+              <tr>
+                @for (column of columns; track column.label) {
+                  @if (column.sort; as field) {
+                    <th scope="col" [attr.aria-sort]="sortDirection(field)">
+                      <button type="button" class="sort-button" (click)="sortBy(field)">
+                        {{ column.label }}
+                        @switch (sortDirection(field)) {
+                          @case ('ascending') {
+                            <i class="icon element-sort-up" aria-hidden="true"></i>
+                          }
+                          @case ('descending') {
+                            <i class="icon element-sort-down" aria-hidden="true"></i>
+                          }
+                        }
+                      </button>
+                    </th>
+                  } @else {
+                    <th scope="col">{{ column.label }}</th>
+                  }
+                }
+              </tr>
+            </thead>
+            <tbody>
+              @for (employee of result.items; track employee.id) {
+                <tr
+                  class="clickable"
+                  [class.table-active]="employee.id === this.employee()"
+                  (click)="openFromRow(employee.id, $event)"
+                >
+                  <td>
+                    <a
+                      [routerLink]="[]"
+                      [queryParams]="{ employee: employee.id }"
+                      queryParamsHandling="merge"
+                      [attr.aria-current]="employee.id === this.employee() ? 'true' : null"
+                      >{{ employee.last_name }}, {{ employee.first_name }}</a
+                    >
+                    <div class="si-caption text-secondary">{{ employee.email }}</div>
+                  </td>
+                  <td>{{ employee.employee_number }}</td>
+                  <td>{{ employee.department }}</td>
+                  <td>{{ employee.job_title }}</td>
+                  <td>{{ employee.location }}</td>
+                  <td>
+                    <div class="d-flex flex-wrap gap-2">
+                      @for (assignment of employee.skills; track assignment.skill.id) {
+                        <si-badge [type]="levelBadge[assignment.level]">
+                          {{ assignment.skill.name }} · {{ assignment.level }}
+                        </si-badge>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (result.total > pageSize) {
+          <si-pagination
+            class="mt-4"
+            [currentPage]="result.page"
+            [pageSize]="pageSize"
+            [totalRowCount]="result.total"
+            (currentPageChange)="goToPage($event)"
+          />
+        }
+      }
+    } @else {
+      <si-loading-spinner />
     }
-  }
-} @else {
-  <si-loading-spinner />
-}
+  </div>
+
+  <si-side-panel-content heading="Employee" closeButtonLabel="Close employee details">
+    @if (employee(); as id) {
+      <app-employee-panel [employeeId]="id" (changed)="updateRow($event)" (exit)="closePanel()" />
+    }
+  </si-side-panel-content>
+</si-side-panel>

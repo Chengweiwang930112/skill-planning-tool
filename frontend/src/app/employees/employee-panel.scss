@@ -1,0 +1,32 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 100%;
+}
+
+.details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.5rem 1.5rem;
+
+  dt {
+    font-weight: normal;
+    color: var(--element-text-secondary);
+  }
+
+  dd {
+    margin: 0;
+  }
+}
+
+.level {
+  inline-size: 9.5rem;
+}
+
+.actions {
+  margin-block-start: auto;
+  position: sticky;
+  inset-block-end: 0;
+  background: var(--element-base-1);
+  border-block-start: 1px solid var(--element-ui-4);
+}

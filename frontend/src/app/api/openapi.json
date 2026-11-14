@@ -210,6 +210,69 @@
         }
       }
     },
+    "/api/v1/employees/{employee_id}/skills": {
+      "put": {
+        "tags": [
+          "employees"
+        ],
+        "summary": "Replace all skills of an employee",
+        "description": "Sets the employee's complete set of skills in one transaction: listed skills are\nassigned at their level, creating catalogue entries for new names, and all others are\nremoved. Use this to save several edits at once; it either applies all or none.",
+        "operationId": "replace_skills_api_v1_employees__employee_id__skills_put",
+        "parameters": [
+          {
+            "name": "employee_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Employee Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmployeeSkillsWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmployeeRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Employee not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/employees/{employee_id}/skills/{skill_id}": {
       "put": {
         "tags": [
@@ -826,6 +889,24 @@
         ],
         "title": "EmployeeRead"
       },
+      "EmployeeSkillsWrite": {
+        "properties": {
+          "skills": {
+            "items": {
+              "$ref": "#/components/schemas/SkillLevelWrite"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Skills",
+            "description": "The employee's complete set of skills; skills not listed are removed."
+          }
+        },
+        "type": "object",
+        "required": [
+          "skills"
+        ],
+        "title": "EmployeeSkillsWrite"
+      },
       "HealthResponse": {
         "properties": {
           "status": {
@@ -1409,6 +1490,38 @@
           "name"
         ],
         "title": "SkillCreate"
+      },
+      "SkillLevelWrite": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "examples": [
+              "Kubernetes"
+            ]
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "beginner",
+              "intermediate",
+              "advanced",
+              "expert"
+            ],
+            "description": "Ordered from lowest to highest.",
+            "examples": [
+              "advanced"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "level"
+        ],
+        "title": "SkillLevelWrite"
       },
       "SkillRead": {
         "properties": {

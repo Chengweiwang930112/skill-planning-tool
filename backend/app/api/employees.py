@@ -9,6 +9,7 @@ from app.models import Skill
 from app.schemas import (
     EmployeeQuery,
     EmployeeRead,
+    EmployeeSkillsWrite,
     Page,
     SkillAssignmentRead,
     SkillAssignmentWrite,
@@ -49,6 +50,27 @@ async def get_employee(session: Session, employee_id: int) -> EmployeeRead:
     employee = await service.get_employee(session, employee_id)
     if employee is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"Employee {employee_id} does not exist")
+    return EmployeeRead.model_validate(employee)
+
+
+@router.put(
+    "/{employee_id}/skills",
+    summary="Replace all skills of an employee",
+    responses={status.HTTP_404_NOT_FOUND: problem_response("Employee not found")},
+)
+async def replace_skills(
+    session: Session, employee_id: int, body: EmployeeSkillsWrite
+) -> EmployeeRead:
+    """Sets the employee's complete set of skills in one transaction: listed skills are
+    assigned at their level, creating catalogue entries for new names, and all others are
+    removed. Use this to save several edits at once; it either applies all or none."""
+    if await service.get_employee(session, employee_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"Employee {employee_id} does not exist")
+    await service.replace_skills(session, employee_id, body.skills)
+    # The existence check loaded the old skills into the session; read the new ones.
+    session.expunge_all()
+    employee = await service.get_employee(session, employee_id)
+    assert employee is not None
     return EmployeeRead.model_validate(employee)
 
 

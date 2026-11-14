@@ -10,8 +10,10 @@ import { provideRouter, Router, withComponentInputBinding } from '@angular/route
 import { RouterTestingHarness } from '@angular/router/testing';
 import { SiPaginationComponent } from '@siemens/element-ng/pagination';
 import { SiSearchBarComponent } from '@siemens/element-ng/search-bar';
-import type { Employee, EmployeePage } from '../api/models';
+import { SiSidePanelComponent } from '@siemens/element-ng/side-panel';
+import type { Employee, EmployeePage, SkillPage } from '../api/models';
 import { EmployeeList, PAGE_SIZE } from './employee-list';
+import { EmployeePanel } from './employee-panel';
 
 const anna: Employee = {
   id: 1,
@@ -52,7 +54,25 @@ describe('EmployeeList', () => {
     harness = await RouterTestingHarness.create();
   });
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    flushSuggestions();
+    http.verify();
+  });
+
+  /** Answers the requests the panel's typeahead makes on its own. */
+  function flushSuggestions(): void {
+    const none: SkillPage = { items: [], total: 0, page: 1, page_size: 10 };
+    http
+      .match((r) => r.url === '/api/v1/skills')
+      .filter((r) => !r.cancelled)
+      .forEach((r) => r.flush(none));
+  }
+
+  async function settle(): Promise<void> {
+    flushSuggestions();
+    await new Promise((resolve) => setTimeout(resolve));
+    TestBed.tick();
+  }
 
   async function open(url: string): Promise<TestRequest> {
     await harness.navigateByUrl(url);
@@ -175,6 +195,116 @@ describe('EmployeeList', () => {
     await respond(await nextRequest(), page([anna]));
 
     expect(view.textContent).toContain('Schmidt, Anna');
+  });
+
+  async function panelRequest(id: number): Promise<TestRequest> {
+    for (let attempt = 0; attempt < 20; attempt++) {
+      TestBed.tick();
+      const [request] = http.match(`/api/v1/employees/${id}`);
+      if (request) {
+        return request;
+      }
+      await new Promise((resolve) => setTimeout(resolve));
+    }
+    throw new Error(`Employee ${id} was not requested`);
+  }
+
+  function sidePanel(): SiSidePanelComponent {
+    return harness.fixture.debugElement.query(By.directive(SiSidePanelComponent)).componentInstance;
+  }
+
+  it('opens an employee in the side panel from the name', async () => {
+    const view = await respond(await open('/employees?q=schmidt'), page([anna]));
+    expect(sidePanel().collapsed()).toBe(true);
+
+    view.querySelector<HTMLAnchorElement>('tbody a')!.click();
+    (await panelRequest(1)).flush(anna);
+    await settle();
+
+    expect(currentUrl()).toBe('/employees?q=schmidt&employee=1');
+    expect(sidePanel().collapsed()).toBe(false);
+    expect(view.querySelector('app-employee-panel h2')?.textContent).toBe('Anna Schmidt');
+  });
+
+  it('opens an employee from anywhere in the row and highlights the row', async () => {
+    const view = await respond(await open('/employees'), page([anna]));
+    const row = view.querySelector('tbody tr')!;
+
+    row.querySelectorAll('td')[2].click();
+    (await panelRequest(1)).flush(anna);
+    await settle();
+
+    expect(currentUrl()).toBe('/employees?employee=1');
+    expect(row.classList).toContain('table-active');
+  });
+
+  it('does not open the panel when the click ends a text selection', async () => {
+    const view = await respond(await open('/employees'), page([anna]));
+    const selection = vi
+      .spyOn(window, 'getSelection')
+      .mockReturnValue({ toString: () => 'anna' } as Selection);
+
+    view.querySelectorAll<HTMLElement>('tbody td')[1].click();
+    await settle();
+    selection.mockRestore();
+
+    expect(currentUrl()).toBe('/employees');
+  });
+
+  it('still shows the list when the panel loads first', async () => {
+    await harness.navigateByUrl('/employees?employee=1');
+    const list = await nextRequest();
+    (await panelRequest(1)).flush(anna);
+    await settle();
+
+    const view = await respond(list, page([anna]));
+
+    expect(view.querySelector('tbody')?.textContent).toContain('Schmidt, Anna');
+  });
+
+  it('shows edits made in the panel in the list', async () => {
+    const list = await open('/employees?employee=1');
+    (await panelRequest(1)).flush(anna);
+    list.flush(page([anna]));
+    await settle();
+    const view = harness.routeNativeElement as HTMLElement;
+
+    const panel: EmployeePanel = harness.fixture.debugElement.query(
+      By.directive(EmployeePanel),
+    ).componentInstance;
+    panel.changed.emit({ ...anna, skills: [{ skill: { id: 9, name: 'Go' }, level: 'advanced' }] });
+    panel.changed.emit({ ...anna, id: 42 });
+    await settle();
+
+    const badges = [...view.querySelectorAll('tbody si-badge')].map((b) => b.textContent?.trim());
+    expect(badges).toEqual(['Go · advanced']);
+  });
+
+  it('closes the panel by removing the employee from the URL', async () => {
+    const list = await open('/employees?employee=1&page=2');
+    (await panelRequest(1)).flush(anna);
+    list.flush(page([anna], 30, 2));
+    await settle();
+
+    sidePanel().closed.emit();
+    await settle();
+
+    expect(currentUrl()).toBe('/employees?page=2');
+  });
+
+  it('closes the panel when the panel asks to exit', async () => {
+    const list = await open('/employees?employee=1');
+    (await panelRequest(1)).flush(anna);
+    list.flush(page([anna]));
+    await settle();
+
+    const panel: EmployeePanel = harness.fixture.debugElement.query(
+      By.directive(EmployeePanel),
+    ).componentInstance;
+    panel.exit.emit();
+    await settle();
+
+    expect(currentUrl()).toBe('/employees');
   });
 
   function searchBar(): SiSearchBarComponent {

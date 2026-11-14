@@ -7,9 +7,11 @@ import { SiInlineNotificationComponent } from '@siemens/element-ng/inline-notifi
 import { SiLoadingSpinnerComponent } from '@siemens/element-ng/loading-spinner';
 import { SiPaginationComponent } from '@siemens/element-ng/pagination';
 import { SiSearchBarComponent } from '@siemens/element-ng/search-bar';
-import type { EmployeePage, EmployeeSort } from '../api/models';
+import { SiSidePanelComponent, SiSidePanelContentComponent } from '@siemens/element-ng/side-panel';
+import type { Employee, EmployeePage, EmployeeSort } from '../api/models';
 import { problemMessage } from '../api/problem';
 import { LEVEL_BADGE } from '../shared/level';
+import { EmployeePanel } from './employee-panel';
 
 export const PAGE_SIZE = 20;
 const DEFAULT_SORT: EmployeeSort = 'last_name';
@@ -20,6 +22,7 @@ type SortField = 'last_name' | 'employee_number' | 'department' | 'location';
 @Component({
   selector: 'app-employee-list',
   imports: [
+    EmployeePanel,
     RouterLink,
     SiBadgeComponent,
     SiEmptyStateComponent,
@@ -27,6 +30,8 @@ type SortField = 'last_name' | 'employee_number' | 'department' | 'location';
     SiLoadingSpinnerComponent,
     SiPaginationComponent,
     SiSearchBarComponent,
+    SiSidePanelComponent,
+    SiSidePanelContentComponent,
   ],
   templateUrl: './employee-list.html',
   styleUrl: './employee-list.scss',
@@ -35,6 +40,10 @@ export class EmployeeList {
   readonly q = input<string>();
   readonly sort = input<EmployeeSort>();
   readonly page = input(1, { transform: (value: unknown) => numberAttribute(value, 1) });
+  /** The employee shown in the side panel. */
+  readonly employee = input(undefined, {
+    transform: (value: unknown) => (value == null ? undefined : numberAttribute(value)),
+  });
 
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -76,6 +85,35 @@ export class EmployeeList {
   protected sortBy(field: SortField): void {
     const next = this.activeSort() === field ? `-${field}` : field;
     this.navigate({ sort: next === DEFAULT_SORT ? null : next, page: null });
+  }
+
+  /** The name link opens the panel for keyboard users; the row is the larger mouse target. */
+  protected openFromRow(id: number, event: MouseEvent): void {
+    const target = event.target as Element;
+    if (target.closest('a') || window.getSelection()?.toString()) {
+      return;
+    }
+    this.navigate({ employee: id });
+  }
+
+  protected closePanel(): void {
+    this.navigate({ employee: null });
+  }
+
+  protected updateRow(updated: Employee): void {
+    // Setting the value of a loading resource would cancel its request, and the
+    // response will contain the change anyway.
+    if (!this.employees.hasValue() || this.employees.isLoading()) {
+      return;
+    }
+    const page = this.employees.value();
+    if (!page.items.some((e) => e.id === updated.id)) {
+      return;
+    }
+    this.employees.value.set({
+      ...page,
+      items: page.items.map((e) => (e.id === updated.id ? updated : e)),
+    });
   }
 
   protected search(q: string): void {

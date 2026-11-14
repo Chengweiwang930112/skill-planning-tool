@@ -11,6 +11,7 @@ from pydantic import (
     StringConstraints,
     WithJsonSchema,
     computed_field,
+    field_validator,
 )
 
 from app.models import ImportStatus, ProficiencyLevel
@@ -105,6 +106,28 @@ class SkillCreate(BaseModel):
 
 class SkillAssignmentWrite(BaseModel):
     level: Level = Field(examples=["advanced"])
+
+
+class SkillLevelWrite(BaseModel):
+    name: SkillName
+    level: Level = Field(examples=["advanced"])
+
+
+class EmployeeSkillsWrite(BaseModel):
+    skills: list[SkillLevelWrite] = Field(
+        max_length=100,
+        description="The employee's complete set of skills; skills not listed are removed.",
+    )
+
+    @field_validator("skills")
+    @classmethod
+    def _names_are_unique(cls, skills: list[SkillLevelWrite]) -> list[SkillLevelWrite]:
+        seen: set[str] = set()
+        for skill in skills:
+            if skill.name.lower() in seen:
+                raise ValueError(f"{skill.name} is listed more than once")
+            seen.add(skill.name.lower())
+        return skills
 
 
 class SkillAssignmentRead(BaseModel):

@@ -1,0 +1,133 @@
+@if (loadError(); as message) {
+  <div class="p-6">
+    <si-inline-notification
+      severity="danger"
+      heading="The employee could not be loaded."
+      [message]="message"
+    />
+  </div>
+} @else if (employee.value(); as e) {
+  <div class="p-6 d-flex flex-column gap-6">
+    <div>
+      <h2 class="si-h4 mb-1">{{ e.first_name }} {{ e.last_name }}</h2>
+      <p class="text-secondary mb-0">{{ e.job_title }}</p>
+    </div>
+
+    <dl class="details mb-0">
+      <dt>Employee no.</dt>
+      <dd>{{ e.employee_number }}</dd>
+      <dt>Email</dt>
+      <dd>
+        <a [href]="'mailto:' + e.email">{{ e.email }}</a>
+      </dd>
+      <dt>Department</dt>
+      <dd>{{ e.department ?? '—' }}</dd>
+      <dt>Location</dt>
+      <dd>{{ e.location ?? '—' }}</dd>
+      <dt>Hire date</dt>
+      <dd>{{ (e.hire_date | date: 'mediumDate') ?? '—' }}</dd>
+    </dl>
+
+    <section>
+      <h3 class="si-h5">Skills</h3>
+
+      @if (draft().length) {
+        <ul class="list-unstyled d-flex flex-column gap-2 mb-6">
+          @for (skill of draft(); track skill.name) {
+            <li class="d-flex align-items-center gap-4">
+              <span class="flex-grow-1">{{ skill.name }}</span>
+              <select
+                #level
+                class="form-select level"
+                [attr.aria-label]="'Level of ' + skill.name"
+                [disabled]="saving()"
+                (change)="changeLevel(skill.name, $any(level.value))"
+              >
+                @for (option of levels; track option) {
+                  <option [value]="option" [selected]="option === skill.level">
+                    {{ option }}
+                  </option>
+                }
+              </select>
+              <button
+                type="button"
+                class="btn btn-circle btn-sm btn-tertiary element-delete"
+                [attr.aria-label]="'Remove ' + skill.name"
+                [disabled]="saving()"
+                (click)="remove(skill.name)"
+              ></button>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="text-secondary">No skills assigned.</p>
+      }
+
+      <form class="d-flex flex-wrap align-items-end gap-4" (ngSubmit)="add()">
+        <div class="flex-grow-1">
+          <label class="form-label" for="new-skill">Add a skill</label>
+          <input
+            id="new-skill"
+            name="skill"
+            class="form-control"
+            autocomplete="off"
+            placeholder="e.g. Kubernetes"
+            maxlength="100"
+            [siTypeahead]="suggestions"
+            typeaheadFullWidth
+            [disabled]="saving()"
+            [(ngModel)]="newSkill"
+          />
+        </div>
+        <div>
+          <label class="form-label" for="new-level">Level</label>
+          <select
+            id="new-level"
+            name="level"
+            class="form-select level"
+            [disabled]="saving()"
+            [(ngModel)]="newLevel"
+          >
+            @for (option of levels; track option) {
+              <option [value]="option">{{ option }}</option>
+            }
+          </select>
+        </div>
+        <button type="submit" class="btn btn-secondary" [disabled]="!newSkill.trim() || saving()">
+          Add
+        </button>
+      </form>
+    </section>
+  </div>
+
+  <footer class="actions p-6">
+    @if (saveError(); as message) {
+      <si-inline-notification
+        class="d-block mb-4"
+        severity="danger"
+        heading="The changes were not saved."
+        [message]="message"
+      />
+    }
+    <div class="d-flex align-items-center gap-4">
+      <span class="flex-grow-1 si-caption text-secondary" role="status">
+        @if (dirty()) {
+          Unsaved changes
+        } @else if (saved()) {
+          All changes saved
+        }
+      </span>
+      <button type="button" class="btn btn-secondary" (click)="exit.emit()">Exit</button>
+      <button
+        type="button"
+        class="btn btn-primary"
+        [disabled]="!dirty() || saving()"
+        (click)="save()"
+      >
+        {{ saving() ? 'Saving…' : 'Save' }}
+      </button>
+    </div>
+  </footer>
+} @else {
+  <si-loading-spinner />
+}

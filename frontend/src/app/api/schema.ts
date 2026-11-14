@@ -41,6 +41,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/employees/{employee_id}/skills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace all skills of an employee
+         * @description Sets the employee's complete set of skills in one transaction: listed skills are
+         *     assigned at their level, creating catalogue entries for new names, and all others are
+         *     removed. Use this to save several edits at once; it either applies all or none.
+         */
+        put: operations["replace_skills_api_v1_employees__employee_id__skills_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/employees/{employee_id}/skills/{skill_id}": {
         parameters: {
             query?: never;
@@ -231,6 +253,14 @@ export interface components {
              * @description Strongest skills first.
              */
             skills: components["schemas"]["SkillAssignmentRead"][];
+        };
+        /** EmployeeSkillsWrite */
+        EmployeeSkillsWrite: {
+            /**
+             * Skills
+             * @description The employee's complete set of skills; skills not listed are removed.
+             */
+            skills: components["schemas"]["SkillLevelWrite"][];
         };
         /** HealthResponse */
         HealthResponse: {
@@ -532,6 +562,20 @@ export interface components {
              */
             name: string;
         };
+        /** SkillLevelWrite */
+        SkillLevelWrite: {
+            /**
+             * Name
+             * @example Kubernetes
+             */
+            name: string;
+            /**
+             * @description Ordered from lowest to highest.
+             * @example advanced
+             * @enum {string}
+             */
+            level: "beginner" | "intermediate" | "advanced" | "expert";
+        };
         /** SkillRead */
         SkillRead: {
             /**
@@ -606,6 +650,50 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployeeRead"];
+                };
+            };
+            /** @description Employee not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Invalid parameters */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    replace_skills_api_v1_employees__employee_id__skills_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                employee_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmployeeSkillsWrite"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

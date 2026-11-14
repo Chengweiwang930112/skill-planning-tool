@@ -3,7 +3,7 @@ from typing import Any
 import pytest
 from fastapi import status
 from httpx import AsyncClient
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import EmployeeSkill, ProficiencyLevel, Skill
@@ -154,3 +154,106 @@ async def test_unknown_employee_or_skill_is_a_404_problem(
     assert (unknown_employee.status_code, unknown_skill.status_code) == (404, 404)
     assert unknown_employee.json()["detail"] == "Employee 999999 does not exist"
     assert unknown_skill.json()["detail"] == "Skill 999999 does not exist"
+
+
+def skills_url(employee_id: int) -> str:
+    return f"/api/v1/employees/{employee_id}/skills"
+
+
+async def test_replaces_all_skills_in_one_request(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    go, python, k8s = Skill(name="Go"), Skill(name="Python"), Skill(name="Kubernetes")
+    employee = make_employee({go: ProficiencyLevel.BEGINNER, python: ProficiencyLevel.EXPERT})
+    await persist(session, employee, k8s)
+
+    response = await client.put(
+        skills_url(employee.id),
+        json={
+            "skills": [
+                {"name": "python", "level": "advanced"},
+                {"name": "kubernetes", "level": "expert"},
+                {"name": "Rust", "level": "beginner"},
+            ]
+        },
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert [(s["skill"]["name"], s["level"]) for s in response.json()["skills"]] == [
+        ("Kubernetes", "expert"),
+        ("Python", "advanced"),
+        ("Rust", "beginner"),
+    ]
+    assert await employee_skills(client, employee.id) == [
+        ("Kubernetes", "expert"),
+        ("Python", "advanced"),
+        ("Rust", "beginner"),
+    ]
+    assert await session.scalar(select(func.count()).select_from(Skill)) == 4
+
+
+async def test_replacing_leaves_unchanged_assignments_untouched(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    go, python = Skill(name="Go"), Skill(name="Python")
+    employee = make_employee({go: ProficiencyLevel.BEGINNER, python: ProficiencyLevel.EXPERT})
+    await persist(session, employee)
+    # now() is fixed within the test's transaction, so updated_at cannot show an update;
+    # the row's physical location (ctid) changes with every update.
+    row_version = text("SELECT ctid::text FROM employee_skill WHERE skill_id = :id")
+    go_before = await session.scalar(row_version, {"id": go.id})
+    python_before = await session.scalar(row_version, {"id": python.id})
+
+    await client.put(
+        skills_url(employee.id),
+        json={
+            "skills": [{"name": "Go", "level": "advanced"}, {"name": "Python", "level": "expert"}]
+        },
+    )
+
+    assert await session.scalar(row_version, {"id": go.id}) != go_before
+    assert await session.scalar(row_version, {"id": python.id}) == python_before
+
+
+async def test_replacing_with_nothing_removes_every_skill(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    employee = make_employee({Skill(name="Go"): ProficiencyLevel.BEGINNER})
+    await persist(session, employee)
+
+    response = await client.put(skills_url(employee.id), json={"skills": []})
+
+    assert response.json()["skills"] == []
+    assert await session.scalar(select(func.count()).select_from(EmployeeSkill)) == 0
+
+
+@pytest.mark.parametrize(
+    ("skills", "reason"),
+    [
+        (
+            [{"name": "Go", "level": "expert"}, {"name": "go", "level": "beginner"}],
+            "more than once",
+        ),
+        ([{"name": "Go", "level": "guru"}], "must be one of"),
+        ([{"name": " ", "level": "expert"}], "at least 1 character"),
+    ],
+    ids=["duplicate", "level", "blank-name"],
+)
+async def test_rejects_an_invalid_skill_list(
+    client: AsyncClient, session: AsyncSession, skills: list[dict[str, str]], reason: str
+) -> None:
+    employee = make_employee({Skill(name="Go"): ProficiencyLevel.BEGINNER})
+    await persist(session, employee)
+
+    response = await client.put(skills_url(employee.id), json={"skills": skills})
+
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    assert reason in response.json()["errors"][0]["reason"]
+    assert await employee_skills(client, employee.id) == [("Go", "beginner")]
+
+
+async def test_replacing_skills_of_an_unknown_employee_is_a_404(client: AsyncClient) -> None:
+    response = await client.put(skills_url(999999), json={"skills": []})
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.json()["detail"] == "Employee 999999 does not exist"

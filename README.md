@@ -4,8 +4,8 @@ An internal tool for team leads: import employees from a CSV, keep track of
 their skills and proficiency levels, and answer questions such as *"who knows
 Kubernetes at an advanced level?"* without asking around in chat.
 
-> **Status: milestone M7 — import page.** The backend is feature-complete; the
-> frontend has the employee overview and the CSV import; the features are built in
+> **Status: milestone M8 — skill assignment.** The backend is feature-complete;
+> the frontend has the employee overview, the CSV import and skill assignment; the features are built in
 > the milestones listed under [Roadmap](#roadmap). Each milestone is a
 > self-contained commit with its own tests.
 
@@ -237,8 +237,9 @@ from `docker compose up -d db`.
 - Employee detail in a side panel, opened from the overview.
 - Add a skill with autocompletion from the catalogue, creating it if it does
   not exist yet; choose or change its level; remove it.
-- Changes appear immediately and roll back with an error message if the
-  request fails.
+- Edits are collected in a draft and saved together with **Save**, in one
+  request (`PUT /employees/{id}/skills`) that applies all of them or none;
+  **Exit** leaves without saving.
 
 **M9 — Skill search**
 - Search page answering "who knows Kubernetes at an advanced level?": one or

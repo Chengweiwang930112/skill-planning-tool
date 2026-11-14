@@ -1,12 +1,12 @@
 from collections.abc import Sequence
 
-from sqlalchemy import Select, delete, func, literal_column, or_, select
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy import Select, String, any_, delete, func, literal, literal_column, or_, select
+from sqlalchemy.dialects.postgresql import ARRAY, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute, selectinload
 
 from app.models import Employee, EmployeeSkill, ProficiencyLevel, Skill
-from app.schemas import EmployeeQuery
+from app.schemas import EmployeeQuery, SkillLevelWrite
 
 SORTABLE: dict[str, InstrumentedAttribute[object]] = {
     "last_name": Employee.last_name,
@@ -92,4 +92,48 @@ async def remove_skill(session: AsyncSession, employee_id: int, skill_id: int) -
             EmployeeSkill.employee_id == employee_id, EmployeeSkill.skill_id == skill_id
         )
     )
+    await session.commit()
+
+
+async def replace_skills(
+    session: AsyncSession, employee_id: int, skills: list[SkillLevelWrite]
+) -> None:
+    """Makes `skills` the employee's complete set of skills, in one transaction."""
+    if skills:
+        await session.execute(
+            insert(Skill)
+            .values([{"name": skill.name} for skill in skills])
+            .on_conflict_do_nothing(index_elements=[func.lower(Skill.name)])
+        )
+    names = literal([skill.name.lower() for skill in skills], ARRAY(String))
+    skill_ids = {
+        name: skill_id
+        for skill_id, name in await session.execute(
+            select(Skill.id, func.lower(Skill.name)).where(func.lower(Skill.name) == any_(names))
+        )
+    }
+    await session.execute(
+        delete(EmployeeSkill).where(
+            EmployeeSkill.employee_id == employee_id,
+            EmployeeSkill.skill_id.not_in(skill_ids.values()),
+        )
+    )
+    if skills:
+        statement = insert(EmployeeSkill).values(
+            [
+                {
+                    "employee_id": employee_id,
+                    "skill_id": skill_ids[s.name.lower()],
+                    "level": s.level,
+                }
+                for s in skills
+            ]
+        )
+        await session.execute(
+            statement.on_conflict_do_update(
+                index_elements=[EmployeeSkill.employee_id, EmployeeSkill.skill_id],
+                set_={"level": statement.excluded.level, "updated_at": func.now()},
+                where=EmployeeSkill.level != statement.excluded.level,
+            )
+        )
     await session.commit()
