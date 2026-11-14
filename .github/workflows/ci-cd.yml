@@ -1,0 +1,185 @@
+# lint → test → build image → push to ECR → deploy to ECS
+#
+# GitHub Actions has no stages; a stage here is the jobs that share the same
+# `needs`, so they run in parallel and the next stage starts once all of them pass.
+#
+# Pull requests run the first three stages. Pushes to main run all five; the last
+# two only print what they would do, as there is no AWS environment yet. The
+# deployment waits for a click: the `production` environment has required
+# reviewers (Settings → Environments), so the run pauses at "Review deployments".
+name: CI/CD
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  # A new push to a pull request cancels its previous run; runs on main never cancel,
+  # and do not wait for each other either (a deployment awaiting approval would
+  # otherwise hold up every later run).
+  group: ci-cd-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  backend-lint:
+    name: Lint · backend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.12.3"
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy
+
+  frontend-lint:
+    name: Lint · frontend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      - name: Type check
+        run: |
+          npx tsc --noEmit -p tsconfig.app.json
+          npx tsc --noEmit -p tsconfig.spec.json
+
+  backend-test:
+    name: Test · backend
+    needs: [backend-lint, frontend-lint]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Start PostgreSQL
+        working-directory: .
+        run: docker compose up --detach --wait db
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.12.3"
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - run: uv sync --locked
+      - name: Migrations match the models
+        run: |
+          uv run alembic upgrade head
+          uv run alembic check
+      - run: uv run pytest
+
+  frontend-test:
+    name: Test · frontend
+    needs: [backend-lint, frontend-lint]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run test:ci
+      # The API types are generated from the backend's OpenAPI schema; this fails when
+      # an API change was committed without regenerating them.
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.12.3"
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - name: API types match the backend
+        run: |
+          npm run api:types
+          git diff --exit-code -- src/app/api
+
+  build-image:
+    name: Build · image
+    needs: [backend-test, frontend-test]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          tags: skill-planning
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Start it like `make up`, migrations included
+        run: docker compose --profile app up --no-build --detach --wait
+      - name: Smoke test
+        run: |
+          curl --fail --silent --show-error http://127.0.0.1:8080/readyz
+          curl --fail --silent --show-error http://127.0.0.1:8080/employees | grep --quiet '<app-root'
+          curl --fail --silent --show-error 'http://127.0.0.1:8080/api/v1/employees?page_size=1'
+      - name: Container logs
+        if: failure()
+        run: docker compose --profile app logs
+      - name: Scan for vulnerabilities
+        run: >
+          docker run --rm --volume /var/run/docker.sock:/var/run/docker.sock
+          aquasec/trivy:0.76.2 image
+          --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1
+          skill-planning
+
+  # Placeholder: with an AWS account, this would assume a role via OIDC, log in to
+  # ECR and push the image built above, tagged with the commit SHA.
+  push-ecr:
+    name: Push · ECR
+    needs: build-image
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Push (simulated)
+        run: |
+          echo "Image skill-planning:${GITHUB_SHA::7} pushed to ECR (simulated, nothing was pushed)."
+
+  # Placeholder: with an AWS account, this would run `alembic upgrade head` as a
+  # one-off ECS task of the new image, then update the service and wait until it is
+  # stable; see ADR 0008.
+  deploy-ecs:
+    name: Deploy · ECS
+    needs: push-ecr
+    runs-on: ubuntu-24.04
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - name: Deploy (simulated)
+        run: |
+          echo "Image skill-planning:${GITHUB_SHA::7} deployed to ECS (simulated, nothing was deployed)."

@@ -4,11 +4,12 @@ An internal tool for team leads: import employees from a CSV, keep track of
 their skills and proficiency levels, and answer questions such as *"who knows
 Kubernetes at an advanced level?"* without asking around in chat.
 
-> **Status: milestone M10 — container images.** All four features are complete
-> in the backend and the frontend — employee import, employee overview, skill
-> assignment and skill search — and both ship as container images. CI/CD (M11)
-> follows; see [Roadmap](#roadmap). Each milestone is a self-contained commit
-> with its own tests.
+> **Status: complete (M11).** All four features — employee import, employee
+> overview, skill assignment and skill search — work in the backend and the
+> frontend, ship as one container image and pass a CI/CD pipeline.
+> Design decisions are recorded in [docs/adr](docs/adr/README.md). Each
+> milestone of the [Roadmap](#roadmap) is a self-contained commit with its own
+> tests.
 
 ## Tech stack
 
@@ -22,11 +23,13 @@ Kubernetes at an advanced level?"* without asking around in chat.
 
 ```
 .
+├── .github/workflows the CI/CD pipeline
 ├── backend/          FastAPI application (uv project)
 │   ├── app/          application code
 │   └── migrations/   Alembic migrations
 ├── frontend/         Angular application (npm project)
 ├── docker/postgres/  database init script (creates the test database)
+├── docs/adr/         architecture decision records
 ├── Dockerfile        the application image (API and frontend)
 ├── samples/          CSV files to try the import with
 ├── scripts/          dev.ps1 / dev.sh behind the Makefile
@@ -35,8 +38,26 @@ Kubernetes at an advanced level?"* without asking around in chat.
 
 One repository rather than two: the backend contract and the frontend that
 consumes it change together, and at this size a split would only add
-coordination overhead. The two applications stay independently buildable and
-are shipped as separate container images.
+coordination overhead. The two applications stay independently buildable, and
+ship together as one image ([ADR 0003](docs/adr/0003-single-image.md)).
+
+## Architecture
+
+```mermaid
+flowchart LR
+    browser["Browser<br/>Angular + Element"] -- HTTPS --> alb[Load balancer]
+    alb --> app1["ECS task<br/>FastAPI: /api + frontend build"]
+    alb --> app2["ECS task<br/>…"]
+    app1 --> db[("PostgreSQL<br/>RDS")]
+    app2 --> db
+    migrate["One-off task<br/>alembic upgrade head"] -. before each rollout .-> db
+```
+
+The backend is layered thinly: `app/api` handles HTTP (status codes, problem
+details), `app/services` holds the queries and rules, `app/models.py` the
+schema; the Pydantic models in `app/schemas.py` are the API contract, and the
+frontend's types are generated from it. The reasoning behind the main choices
+is in the [architecture decision records](docs/adr/README.md).
 
 ## Prerequisites
 
@@ -146,15 +167,8 @@ container, which would need a process supervisor:
 - Requests larger than 12 MB are refused by their `Content-Length` before the
   body is read, just above the import's 10 MB limit.
 
-Deploying to ECS:
-
-- **Migrations run as their own task** before a deployment (the `migrate`
-  command), not when the application starts: several tasks starting at once
-  would race to migrate the same database.
-- Configure the application through `APP_DATABASE_URL` (from Secrets Manager);
-  the image defaults to `APP_ENVIRONMENT=production`, which hides Swagger UI.
-- Health checks: `/healthz` (liveness) and `/readyz` (database reachable).
-- One server process per container; scale by running more tasks.
+How the image is deployed to ECS is described in
+[CI/CD](#cicd).
 
 ## Skill catalogue
 
@@ -269,6 +283,51 @@ pipeline.
 Both suites fail below 80% coverage. The backend tests need the database
 from `docker compose up -d db`.
 
+## CI/CD
+
+One workflow, [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml),
+runs five stages. GitHub Actions has no stage keyword: a stage is the jobs
+that share the same `needs`, so they run in parallel, and the next stage starts
+once all of them have passed.
+
+```mermaid
+flowchart LR
+    lint["Lint<br/>backend · frontend"] --> test["Test<br/>backend · frontend"]
+    test --> build["Build image<br/>smoke test · Trivy scan"]
+    build --> push["Push to ECR<br/>(simulated)"]
+    push --> approve{{"Manual approval"}}
+    approve --> deploy["Deploy to ECS<br/>(simulated)"]
+```
+
+| Stage         | Runs                                                                                         |
+| ------------- | -------------------------------------------------------------------------------------------- |
+| Lint          | backend: ruff, ruff format, mypy · frontend: ESLint, Prettier, TypeScript compiler           |
+| Test          | backend: `alembic check`, pytest against PostgreSQL · frontend: Vitest, API types up to date |
+| Build image   | the root `Dockerfile`, started like `make up`; smoke test; [Trivy](https://trivy.dev) scan   |
+| Push to ECR   | prints what it would push (simulated)                                                        |
+| Deploy to ECS | after a manual approval, prints what it would deploy (simulated)                             |
+
+Pull requests run lint, test and build; pushes to `main` run all five stages.
+The deployment waits for a click: the job uses the `production` environment,
+and the run pauses at **Review deployments** until a reviewer approves. That
+rule lives in the repository settings, not in the workflow — *Settings →
+Environments → New environment* `production`, tick **Required reviewers** and
+add yourself (optionally **Prevent self-review** for a second pair of eyes, and
+*Deployment branches* limited to `main`). Without it, the deployment runs
+straight after the push.
+
+The last two are placeholders, as there is no AWS account for this project:
+they show where the image would be pushed and deployed, and do nothing.
+[ADR 0008](docs/adr/0008-ci-cd.md) describes what they would do for real —
+OIDC instead of stored AWS keys, migrations as a one-off ECS task before the
+rollout — and the infrastructure they need.
+
+Configuring the application on ECS: `APP_DATABASE_URL` (from Secrets
+Manager); the image defaults to `APP_ENVIRONMENT=production`, which hides
+Swagger UI; health checks are `/healthz` (liveness) and `/readyz` (database
+reachable); each container runs one server process, so scale by running more
+tasks.
+
 ## Roadmap
 
 | Milestone | Scope                                                               |
@@ -285,6 +344,8 @@ from `docker compose up -d db`.
 | M9        | Skill search page                                                   |
 | M10       | Container images and Docker Compose                                 |
 | M11       | CI/CD pipeline, architecture decision records, documentation        |
+
+All milestones are done.
 
 ### Frontend milestones
 

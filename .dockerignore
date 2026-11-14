@@ -12,11 +12,13 @@ frontend/.angular
 backend/tests
 backend/scripts
 .git
+.github
 .idea
 .vscode
 .run
 samples
 docker
+docs
 scripts
 *.md
 Case-Study.pdf
