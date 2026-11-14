@@ -1,7 +1,11 @@
 <si-side-panel mode="over" [collapsed]="!employee()" (closed)="closePanel()">
   <div>
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-4 mb-6">
-      <h1 class="si-h3 mb-0">Employees</h1>
+      @if (embedded()) {
+        <h2 class="si-h4 mb-0">Results</h2>
+      } @else {
+        <h1 class="si-h3 mb-0">Employees</h1>
+      }
       <si-search-bar
         class="search"
         placeholder="Search by name, email or employee number"
@@ -24,14 +28,16 @@
       @if (result.total === 0) {
         <si-empty-state
           icon="element-user-group"
-          [heading]="q() ? 'No employees match your search' : 'No employees yet'"
+          [heading]="filtered() ? 'No employees match your search' : 'No employees yet'"
           [content]="
-            q()
-              ? 'Try a different name, email or employee number.'
-              : 'Import a CSV file to add employees.'
+            skill().length
+              ? 'Try a lower minimum level or fewer skills.'
+              : q()
+                ? 'Try a different name, email or employee number.'
+                : 'Import a CSV file to add employees.'
           "
         >
-          @if (!q()) {
+          @if (!filtered()) {
             <a class="btn btn-primary" routerLink="/imports">Import employees</a>
           }
         </si-empty-state>
@@ -88,7 +94,10 @@
                   <td>
                     <div class="d-flex flex-wrap gap-2">
                       @for (assignment of employee.skills; track assignment.skill.id) {
-                        <si-badge [type]="levelBadge[assignment.level]">
+                        <si-badge
+                          [type]="levelBadge[assignment.level]"
+                          [class.faded]="faded(assignment)"
+                        >
                           {{ assignment.skill.name }} · {{ assignment.level }}
                         </si-badge>
                       }

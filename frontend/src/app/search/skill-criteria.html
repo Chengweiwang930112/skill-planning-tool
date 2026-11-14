@@ -1,0 +1,71 @@
+@if (draft().length) {
+  <ul class="list-unstyled d-flex flex-column gap-2 mb-4" aria-label="Search criteria">
+    @for (criterion of draft(); track criterion.name; let i = $index) {
+      <li class="d-flex align-items-center gap-4">
+        <span class="name">{{ criterion.name }}</span>
+        <select
+          #level
+          class="form-select level"
+          [attr.aria-label]="'Minimum level of ' + criterion.name"
+          (change)="setLevel(i, $any(level.value))"
+        >
+          <option value="" [selected]="!criterion.level">any level</option>
+          @for (option of levels; track option) {
+            <option [value]="option" [selected]="option === criterion.level">
+              {{ option === 'expert' ? 'expert' : option + ' or higher' }}
+            </option>
+          }
+        </select>
+        <button
+          type="button"
+          class="btn btn-circle btn-sm btn-tertiary element-delete"
+          [attr.aria-label]="'Remove ' + criterion.name"
+          (click)="remove(i)"
+        ></button>
+      </li>
+    }
+  </ul>
+}
+
+<form class="d-flex flex-wrap align-items-end gap-4" (ngSubmit)="search()">
+  <div class="name">
+    <label class="form-label" for="criterion-skill">Skill</label>
+    <input
+      id="criterion-skill"
+      name="skill"
+      class="form-control"
+      autocomplete="off"
+      placeholder="e.g. Kubernetes"
+      maxlength="100"
+      [siTypeahead]="suggestions"
+      typeaheadFullWidth
+      [disabled]="draft().length >= maxCriteria"
+      [(ngModel)]="newSkill"
+    />
+  </div>
+  <div>
+    <label class="form-label" for="criterion-level">Minimum level</label>
+    <select id="criterion-level" name="level" class="form-select level" [(ngModel)]="newLevel">
+      <option value="">any level</option>
+      @for (option of levels; track option) {
+        <option [value]="option">
+          {{ option === 'expert' ? 'expert' : option + ' or higher' }}
+        </option>
+      }
+    </select>
+  </div>
+  <button
+    type="button"
+    class="btn btn-secondary"
+    [disabled]="!newSkill.trim() || draft().length >= maxCriteria"
+    (click)="add()"
+  >
+    Add skill
+  </button>
+  <button type="submit" class="btn btn-primary">Search</button>
+</form>
+@if (draft().length >= maxCriteria) {
+  <p class="si-caption text-secondary mt-2">At most {{ maxCriteria }} skills per search.</p>
+} @else if (pending() && criteria().length) {
+  <p class="si-caption text-secondary mt-2" role="status">Press Search to update the results.</p>
+}

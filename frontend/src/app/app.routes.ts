@@ -8,6 +8,11 @@ export const routes: Routes = [
     loadComponent: () => import('./employees/employee-list').then((m) => m.EmployeeList),
   },
   {
+    path: 'search',
+    title: 'Skill search · Staff & Skill Planning',
+    loadComponent: () => import('./search/skill-search').then((m) => m.SkillSearch),
+  },
+  {
     path: 'imports',
     title: 'Import · Staff & Skill Planning',
     loadComponent: () => import('./imports/import-page').then((m) => m.ImportPage),

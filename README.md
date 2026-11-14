@@ -4,10 +4,10 @@ An internal tool for team leads: import employees from a CSV, keep track of
 their skills and proficiency levels, and answer questions such as *"who knows
 Kubernetes at an advanced level?"* without asking around in chat.
 
-> **Status: milestone M8 — skill assignment.** The backend is feature-complete;
-> the frontend has the employee overview, the CSV import and skill assignment; the features are built in
-> the milestones listed under [Roadmap](#roadmap). Each milestone is a
-> self-contained commit with its own tests.
+> **Status: milestone M9 — all four features are complete** in the backend and
+> the frontend: employee import, employee overview, skill assignment and skill
+> search. Containers (M10) and CI/CD (M11) follow; see [Roadmap](#roadmap). Each
+> milestone is a self-contained commit with its own tests.
 
 ## Tech stack
 

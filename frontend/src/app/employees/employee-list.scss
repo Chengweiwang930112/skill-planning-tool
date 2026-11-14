@@ -23,3 +23,9 @@
 .clickable {
   cursor: pointer;
 }
+
+// Greyscale, so that a faded badge cannot be mistaken for a lower level's colour.
+.faded {
+  filter: grayscale(1);
+  opacity: 0.55;
+}

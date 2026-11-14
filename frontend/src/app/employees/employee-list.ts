@@ -1,5 +1,12 @@
 import { httpResource } from '@angular/common/http';
-import { Component, computed, inject, input, numberAttribute } from '@angular/core';
+import {
+  booleanAttribute,
+  Component,
+  computed,
+  inject,
+  input,
+  numberAttribute,
+} from '@angular/core';
 import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import { SiBadgeComponent } from '@siemens/element-ng/badge';
 import { SiEmptyStateComponent } from '@siemens/element-ng/empty-state';
@@ -8,8 +15,9 @@ import { SiLoadingSpinnerComponent } from '@siemens/element-ng/loading-spinner';
 import { SiPaginationComponent } from '@siemens/element-ng/pagination';
 import { SiSearchBarComponent } from '@siemens/element-ng/search-bar';
 import { SiSidePanelComponent, SiSidePanelContentComponent } from '@siemens/element-ng/side-panel';
-import type { Employee, EmployeePage, EmployeeSort } from '../api/models';
+import type { Employee, EmployeePage, EmployeeSort, SkillAssignment } from '../api/models';
 import { problemMessage } from '../api/problem';
+import { matchesAny, parseCriterion } from '../shared/criteria';
 import { LEVEL_BADGE } from '../shared/level';
 import { EmployeePanel } from './employee-panel';
 
@@ -44,6 +52,13 @@ export class EmployeeList {
   readonly employee = input(undefined, {
     transform: (value: unknown) => (value == null ? undefined : numberAttribute(value)),
   });
+  /** Skill criteria in the API's `name:level` format; a repeated query parameter. */
+  readonly skill = input([], {
+    transform: (value: unknown): string[] =>
+      value == null ? [] : Array.isArray(value) ? value : [String(value)],
+  });
+  /** Shown inside another page, which owns the page heading. */
+  readonly embedded = input(false, { transform: booleanAttribute });
 
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -60,6 +75,7 @@ export class EmployeeList {
   protected readonly levelBadge = LEVEL_BADGE;
   protected readonly employees = httpResource<EmployeePage>(() => {
     const q = this.q();
+    const skill = this.skill();
     return {
       url: '/api/v1/employees',
       params: {
@@ -67,9 +83,12 @@ export class EmployeeList {
         page_size: PAGE_SIZE,
         sort: this.sort() ?? DEFAULT_SORT,
         ...(q ? { q } : {}),
+        ...(skill.length ? { skill } : {}),
       },
     };
   });
+  protected readonly criteria = computed(() => this.skill().map(parseCriterion));
+  protected readonly filtered = computed(() => !!this.q() || this.skill().length > 0);
   protected readonly error = computed(() => {
     const error = this.employees.error();
     return error ? problemMessage(error) : undefined;
@@ -94,6 +113,17 @@ export class EmployeeList {
       return;
     }
     this.navigate({ employee: id });
+  }
+
+  /** Fetches the current page again, e.g. when a search is repeated unchanged. */
+  reload(): void {
+    this.employees.reload();
+  }
+
+  /** With criteria, skills that do not match them are shown faded. */
+  protected faded(assignment: SkillAssignment): boolean {
+    const criteria = this.criteria();
+    return criteria.length > 0 && !matchesAny(assignment, criteria);
   }
 
   protected closePanel(): void {
