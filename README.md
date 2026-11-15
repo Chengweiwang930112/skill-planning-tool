@@ -32,7 +32,6 @@ Kubernetes at an advanced level?"* without asking around in chat.
 ├── docs/adr/         architecture decision records
 ├── Dockerfile        the application image (API and frontend)
 ├── samples/          CSV files to try the import with
-├── scripts/          dev.ps1 / dev.sh behind the Makefile
 └── docker-compose.yml
 ```
 
@@ -64,29 +63,28 @@ is in the [architecture decision records](docs/adr/README.md).
 - [uv](https://docs.astral.sh/uv/) (Python toolchain and dependency manager)
 - Node.js 22+ and npm 11+
 - Docker (for PostgreSQL)
+- For the `make` shortcuts: Windows and GNU make, e.g. `scoop install make`
 
 ## Quick start
 
 ### Everything at once
 
 ```bash
-make start     # database, migrations, then backend and frontend in the background
+make start     # database, migrations, then backend and frontend in their own windows
 make up        # or: everything as containers, built from the image, on :8080
 make stop      # stop backend, frontend and all containers (data is kept)
 make restart
-make clean     # stop, then delete containers, volumes (database data) and logs
+make clean     # stop, then delete the containers and the database data
 ```
 
-The targets work the same from cmd, PowerShell and bash. They call
-`scripts/dev.ps1` on Windows and `scripts/dev.sh` on Linux and macOS, which can
-also be run directly, e.g. `powershell -File scripts\dev.ps1 start`.
-
-Logs go to `.run/backend.log` and `.run/frontend.log`. The frontend reloads on
-changes; the backend does not (uvicorn's reloader cannot stop a detached worker
-on Windows), so run `make restart` after backend changes, or run
-`uv run uvicorn app.main:app --reload` in a terminal of its own instead. The servers are stopped
-by the port they listen on (8000, 4200), so `make stop` also cleans up servers
-started by hand. The steps below do the same thing one at a time.
+The `Makefile` is for Windows and runs its commands in cmd, so it works the
+same from cmd, PowerShell and Git Bash; each target is the handful of commands
+it shows. `make start` opens the backend and the frontend in two minimised
+windows, which show their logs, and returns once both answer. The frontend
+reloads on changes; after backend changes run `make restart`, or run
+`uv run uvicorn app.main:app --reload` in a terminal of its own instead.
+`make stop` stops the servers by the port they listen on (8000, 4200), so it
+also stops servers started by hand. On Linux and macOS, run the steps below.
 
 ### Database
 

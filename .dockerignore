@@ -15,11 +15,9 @@ backend/scripts
 .github
 .idea
 .vscode
-.run
 samples
 docker
 docs
-scripts
 *.md
 Case-Study.pdf
 **/.env
