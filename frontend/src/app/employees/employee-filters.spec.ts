@@ -52,13 +52,15 @@ describe('EmployeeFilters', () => {
     await settle();
   }
 
+  // The select asks for its options 100ms after it opens.
   async function request(url: string): Promise<TestRequest> {
-    for (let attempt = 0; attempt < 20; attempt++) {
+    for (const deadline = Date.now() + 1000; Date.now() < deadline;) {
       const [match] = http.match((r) => r.url === url);
       if (match) {
         return match;
       }
-      await settle();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      TestBed.tick();
     }
     throw new Error(`No request to ${url}`);
   }
