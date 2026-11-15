@@ -234,7 +234,9 @@ describe('EmployeeList', () => {
     expect(view.textContent).toContain('Invalid request parameters');
 
     // When
-    view.querySelector<HTMLButtonElement>('button.btn-secondary')!.click();
+    [...view.querySelectorAll('button')]
+      .find((b) => b.textContent?.trim() === 'Try again')!
+      .click();
     await respond(await nextRequest(), page([anna]));
 
     // Then
@@ -425,6 +427,23 @@ describe('EmployeeList', () => {
     // Then
     const badges = [...view.querySelectorAll('tbody si-badge')].map((b) => b.textContent?.trim());
     expect(badges).toEqual(['Python · beginner', 'Kubernetes · expert']);
+  });
+
+  it('passes departments and locations from the URL to the API', async () => {
+    // When
+    const request = await open(
+      '/employees?department=Mobility&department=Healthineers&location=Munich',
+    );
+
+    // Then
+    expect(request.request.params.getAll('department')).toEqual(['Mobility', 'Healthineers']);
+    expect(request.request.params.getAll('location')).toEqual(['Munich']);
+
+    // When
+    const view = await respond(request, page([]));
+
+    // Then
+    expect(view.textContent).toContain('Try other departments or locations.');
   });
 
   function paginator(): SiPaginationComponent {

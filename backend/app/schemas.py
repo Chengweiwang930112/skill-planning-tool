@@ -98,6 +98,28 @@ SkillName = Annotated[
 ]
 
 
+def _name_of(value: Any) -> Any:
+    return getattr(value, "name", value)
+
+
+# Departments and locations are their own records, but an employee shows their names.
+NameOf = Annotated[str | None, BeforeValidator(_name_of)]
+
+
+class DepartmentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int = Field(examples=[3])
+    name: str = Field(examples=["Digital Industries"])
+
+
+class LocationRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int = Field(examples=[5])
+    name: str = Field(examples=["Munich"])
+
+
 class SkillWithUsage(SkillRead):
     employee_count: int = Field(description="Employees who have the skill.", examples=[12])
 
@@ -155,9 +177,9 @@ class EmployeeRead(BaseModel):
     first_name: str = Field(examples=["Anna"])
     last_name: str = Field(examples=["Schmidt"])
     email: str = Field(examples=["anna.schmidt@example.com"])
-    department: str | None = Field(examples=["Digital Industries"])
+    department: NameOf = Field(examples=["Digital Industries"])
     job_title: str | None = Field(examples=["Senior Software Engineer"])
-    location: str | None = Field(examples=["Munich"])
+    location: NameOf = Field(examples=["Munich"])
     hire_date: date | None = Field(examples=["2019-04-01"])
     skills: list[SkillAssignmentRead] = Field(description="Strongest skills first.")
 
@@ -167,7 +189,7 @@ class PageQuery(BaseModel):
     page_size: int = Field(20, ge=1, le=100, description="Items per page (max 100).")
 
 
-class SkillQuery(PageQuery):
+class NameQuery(PageQuery):
     q: str | None = Field(
         None,
         min_length=1,
@@ -184,8 +206,20 @@ class EmployeeQuery(PageQuery):
         description="Case-insensitive match on full name, email or employee number.",
         examples=["schmidt"],
     )
-    department: str | None = Field(
-        None, description="Exact department, case-insensitive.", examples=["Digital Industries"]
+    department: list[str] = Field(
+        default_factory=list,
+        max_length=20,
+        description=(
+            "Employees in any of these departments (`GET /departments`). Repeat the parameter "
+            "for several; names are matched ignoring case, spaces and punctuation."
+        ),
+        examples=[["Digital Industries", "Mobility"]],
+    )
+    location: list[str] = Field(
+        default_factory=list,
+        max_length=20,
+        description="Employees at any of these locations (`GET /locations`), like `department`.",
+        examples=[["Munich"]],
     )
     skill: list[Annotated[str, AfterValidator(_check_skill_criterion)]] = Field(
         default_factory=list,

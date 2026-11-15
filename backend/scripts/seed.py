@@ -6,7 +6,7 @@ from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.models import Employee, EmployeeSkill, ProficiencyLevel, Skill
+from app.models import Department, Employee, EmployeeSkill, Location, ProficiencyLevel, Skill
 
 BEG, INT, ADV, EXP = (
     ProficiencyLevel.BEGINNER,
@@ -56,15 +56,17 @@ def _insert(session: Session) -> None:
         return
 
     skills = {name: Skill(name=name) for name in SKILLS}
+    departments = {row[3]: Department(name=row[3]) for row in EMPLOYEES}
+    locations = {row[5]: Location(name=row[5]) for row in EMPLOYEES if row[5]}
     for number, first, last, department, title, location, hired, levels in EMPLOYEES:
         employee = Employee(
             employee_number=number,
             first_name=first,
             last_name=last,
             email=f"{first}.{last}@example.com".lower().replace("ü", "ue"),
-            department=department,
+            department=departments[department],
             job_title=title,
-            location=location,
+            location=locations[location] if location else None,
             hire_date=hired,
             skills=[EmployeeSkill(skill=skills[s], level=lvl) for s, lvl in levels.items()],
         )

@@ -56,7 +56,7 @@ def test_sorts_descending_with_missing_values_last_and_a_stable_tie_break(
     query = listed_sql(session, EmployeeQuery(sort="-department"))
 
     # Then
-    assert "ORDER BY employee.department DESC NULLS LAST, employee.id" in query
+    assert "ORDER BY department.name DESC NULLS LAST, employee.id" in query
 
 
 def test_searches_name_email_and_number_with_wildcards_escaped(session: MagicMock) -> None:
@@ -69,12 +69,18 @@ def test_searches_name_email_and_number_with_wildcards_escaped(session: MagicMoc
     assert "employee.employee_number ILIKE" in query
 
 
-def test_filters_by_department_ignoring_case(session: MagicMock) -> None:
+def test_filters_by_any_of_the_departments_and_locations_by_their_keys(
+    session: MagicMock,
+) -> None:
     # When
-    query = listed_sql(session, EmployeeQuery(department="Mobility"))
+    query = listed_sql(
+        session, EmployeeQuery(department=["Digital Industries", "mobility"], location=["Zug"])
+    )
 
     # Then
-    assert "lower(employee.department) = 'mobility'" in query
+    assert "department.key IN ('digitalindustries', 'mobility')" in query
+    assert ") AND (EXISTS (SELECT 1 FROM location" in query
+    assert "location.key IN ('zug')" in query
 
 
 def test_a_skill_criterion_matches_the_catalogue_key_at_the_level_or_higher(

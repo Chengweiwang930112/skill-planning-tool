@@ -5,10 +5,12 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.models import (
+    Department,
     Employee,
     EmployeeImport,
     EmployeeSkill,
     ImportStatus,
+    Location,
     ProficiencyLevel,
     Skill,
 )
@@ -26,7 +28,12 @@ def make_employee(
         "last_name": f"Schmidt{n}",
         "email": f"employee{n}@example.com",
     }
-    employee = Employee(**(fields | overrides))
+    fields |= overrides
+    # A name makes a new department or location; to share one, pass the same object.
+    for field, model in (("department", Department), ("location", Location)):
+        if isinstance(fields.get(field), str):
+            fields[field] = model(name=fields[field])
+    employee = Employee(**fields)
     employee.skills = [
         EmployeeSkill(skill=skill, level=level) for skill, level in (skills or {}).items()
     ]

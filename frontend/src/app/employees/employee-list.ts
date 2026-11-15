@@ -12,6 +12,7 @@ import type { Employee, EmployeePage, EmployeeSort, SkillAssignment } from '../a
 import { problemMessage } from '../api/problem';
 import { matchesAny, parseCriterion } from '../shared/criteria';
 import { Overflow } from '../shared/overflow';
+import { toList } from '../shared/query-params';
 import { EmployeePanel } from './employee-panel';
 
 export const PAGE_SIZE = 20;
@@ -47,10 +48,9 @@ export class EmployeeList {
     transform: (value: unknown) => (value == null ? undefined : numberAttribute(value)),
   });
   /** Skill criteria in the API's `name:level` format; a repeated query parameter. */
-  readonly skill = input([], {
-    transform: (value: unknown): string[] =>
-      value == null ? [] : Array.isArray(value) ? value : [String(value)],
-  });
+  readonly skill = input([], { transform: toList });
+  readonly department = input([], { transform: toList });
+  readonly location = input([], { transform: toList });
 
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -75,11 +75,18 @@ export class EmployeeList {
         sort: this.sort() ?? DEFAULT_SORT,
         ...(q ? { q } : {}),
         ...(skill.length ? { skill } : {}),
+        ...(this.department().length ? { department: this.department() } : {}),
+        ...(this.location().length ? { location: this.location() } : {}),
       },
     };
   });
   protected readonly criteria = computed(() => this.skill().map(parseCriterion));
-  protected readonly filtered = computed(() => !!this.q() || this.skill().length > 0);
+  protected readonly narrowed = computed(
+    () => this.department().length > 0 || this.location().length > 0,
+  );
+  protected readonly filtered = computed(
+    () => !!this.q() || this.skill().length > 0 || this.narrowed(),
+  );
   protected readonly error = computed(() => {
     const error = this.employees.error();
     return error ? problemMessage(error) : undefined;

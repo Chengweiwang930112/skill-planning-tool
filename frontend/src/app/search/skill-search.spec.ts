@@ -9,6 +9,7 @@ import { By } from '@angular/platform-browser';
 import { provideRouter, Router, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import type { Employee, EmployeePage, SkillPage } from '../api/models';
+import { EmployeeFilters } from '../employees/employee-filters';
 import { SkillCriteria } from './skill-criteria';
 import { SkillSearch } from './skill-search';
 
@@ -218,5 +219,62 @@ describe('SkillSearch', () => {
     request.flush(results([anna]));
     await settle();
     expect(view().querySelector('tbody')?.textContent).toContain('Schmidt, Anna');
+  });
+
+  async function open(url: string): Promise<void> {
+    await harness.navigateByUrl(url);
+    (await employeesRequest()).flush(results([]));
+    await settle();
+  }
+
+  function filters(): EmployeeFilters {
+    return harness.fixture.debugElement.query(By.directive(EmployeeFilters)).componentInstance;
+  }
+
+  it('shows the departments and locations of the search as removable filters', async () => {
+    // When
+    await open('/search?department=Mobility&department=Healthineers&location=Munich');
+
+    // Then
+    // The filter bar also has a pill for the filters it collapses, here "+ 0".
+    const pills = [...view().querySelectorAll('.finder si-filter-bar si-filter-pill')]
+      .map((pill) => pill.textContent?.replace(/\s+/g, '') ?? '')
+      .filter((text) => !text.startsWith('+'));
+    expect(pills).toEqual(['Department:Mobility', 'Department:Healthineers', 'Location:Munich']);
+  });
+
+  it('removes one filter and keeps the others', async () => {
+    // Given
+    await open('/search?department=Mobility&department=Healthineers&page=2');
+
+    // When
+    const mobility = [...view().querySelectorAll('si-filter-pill')].find((pill) =>
+      pill.textContent?.includes('Mobility'),
+    );
+    mobility!.querySelector('button')!.click();
+    (await employeesRequest()).flush(results([]));
+    await settle();
+
+    // Then
+    expect(TestBed.inject(Router).url).toBe('/search?department=Healthineers');
+  });
+
+  it('applies the filters chosen in the panel to the whole search, from the first page', async () => {
+    // Given
+    await open('/search?skill=python&page=3');
+
+    // When
+    filters().valuesChange.emit({ department: ['Mobility'], location: ['Munich', 'Zug'] });
+    const request = await employeesRequest();
+
+    // Then
+    expect(request.request.params.getAll('skill')).toEqual(['python']);
+    expect(request.request.params.getAll('location')).toEqual(['Munich', 'Zug']);
+    expect(request.request.params.get('page')).toBe('1');
+    request.flush(results([]));
+    await settle();
+    expect(decodeURIComponent(TestBed.inject(Router).url)).toBe(
+      '/search?skill=python&department=Mobility&location=Munich&location=Zug',
+    );
   });
 });

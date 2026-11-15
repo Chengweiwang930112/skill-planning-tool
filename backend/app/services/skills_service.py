@@ -5,8 +5,8 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import EmployeeSkill, Skill, skill_key
-from app.schemas import RowErrorRead, SkillImportResult, SkillQuery
+from app.models import EmployeeSkill, Skill, name_key
+from app.schemas import NameQuery, RowErrorRead, SkillImportResult
 from app.services.csv_parsing import parse_skill_csv
 
 
@@ -22,11 +22,11 @@ class SkillInUseError(Exception):
         self.employee_count = employee_count
 
 
-def list_skills(session: Session, query: SkillQuery) -> tuple[Sequence[tuple[Skill, int]], int]:
+def list_skills(session: Session, query: NameQuery) -> tuple[Sequence[tuple[Skill, int]], int]:
     """Skills alphabetically, each with the number of employees who have it."""
     statement = select(Skill)
     if query.q:
-        key = skill_key(query.q)
+        key = name_key(query.q)
         statement = statement.where(
             Skill.key.contains(key, autoescape=True)
             if key
@@ -49,20 +49,20 @@ def create_skill(session: Session, name: str) -> Skill:
     # for the same new name would both pass before one of them hits the unique key.
     skill_id = session.scalar(
         insert(Skill)
-        .values(name=name, key=skill_key(name))
+        .values(name=name, key=name_key(name))
         .on_conflict_do_nothing(index_elements=[Skill.key])
         .returning(Skill.id)
     )
     session.commit()
     if skill_id is None:
-        raise DuplicateSkillError(_by_key(session, skill_key(name)))
+        raise DuplicateSkillError(_by_key(session, name_key(name)))
     skill = session.get(Skill, skill_id)
     assert skill is not None
     return skill
 
 
 def rename_skill(session: Session, skill: Skill, name: str) -> Skill:
-    existing = session.scalar(select(Skill).where(Skill.key == skill_key(name)))
+    existing = session.scalar(select(Skill).where(Skill.key == name_key(name)))
     if existing is not None and existing.id != skill.id:
         raise DuplicateSkillError(existing)
     skill.name = name
@@ -70,7 +70,7 @@ def rename_skill(session: Session, skill: Skill, name: str) -> Skill:
         session.commit()
     except IntegrityError:
         session.rollback()
-        raise DuplicateSkillError(_by_key(session, skill_key(name))) from None
+        raise DuplicateSkillError(_by_key(session, name_key(name))) from None
     return skill
 
 
@@ -85,7 +85,7 @@ def delete_skill(session: Session, skill: Skill) -> None:
 def import_skills(session: Session, content: bytes) -> SkillImportResult:
     """Adds the names in a CSV to the catalogue; names it already has are left alone."""
     names, errors = parse_skill_csv(content)
-    unique = {skill_key(parsed.name): parsed.name for parsed in reversed(names)}
+    unique = {name_key(parsed.name): parsed.name for parsed in reversed(names)}
     created: Sequence[int] = []
     if unique:
         created = session.scalars(

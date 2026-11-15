@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from app.models import Skill
-from app.schemas import SkillQuery
+from app.schemas import NameQuery
 from app.services.skills_service import (
     DuplicateSkillError,
     SkillInUseError,
@@ -25,7 +25,7 @@ def test_lists_skills_with_their_employee_counts(session: MagicMock) -> None:
     session.execute.return_value = [(GO, 12)]
 
     # When
-    rows, total = list_skills(session, SkillQuery())
+    rows, total = list_skills(session, NameQuery())
 
     # Then
     assert (rows, total) == ([(GO, 12)], 1)
@@ -51,7 +51,7 @@ def test_finds_skills_by_their_key_or_else_by_name(
     session.execute.return_value = []
 
     # When
-    list_skills(session, SkillQuery(q=q))
+    list_skills(session, NameQuery(q=q))
 
     # Then
     assert condition in sql(session.execute.call_args.args[0])

@@ -16,3 +16,16 @@
   margin: 0 0 1.75rem;
   color: var(--element-text-secondary);
 }
+
+// Departments and locations narrow down the same search as the skills above them.
+.finder-filters {
+  display: block;
+  margin-block-start: 1.5rem;
+}
+
+// The filter bar collapses the pills that do not fit its width, so it takes the rest
+// of the row rather than the width of its content.
+.finder-filters si-filter-bar {
+  flex: 1 1 0;
+  min-inline-size: 0;
+}

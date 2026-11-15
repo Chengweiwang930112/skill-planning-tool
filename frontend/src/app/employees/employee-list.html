@@ -28,9 +28,11 @@
           [content]="
             skill().length
               ? 'Try a lower minimum level or fewer skills.'
-              : q()
-                ? 'Try a different name, email or employee number.'
-                : 'Import a CSV file to add employees.'
+              : narrowed()
+                ? 'Try other departments or locations.'
+                : q()
+                  ? 'Try a different name, email or employee number.'
+                  : 'Import a CSV file to add employees.'
           "
         >
           @if (!filtered()) {

@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from app.api.imports_api import MAX_UPLOAD_BYTES
 from app.models import Skill
-from app.schemas import RowErrorRead, SkillImportResult, SkillQuery
+from app.schemas import NameQuery, RowErrorRead, SkillImportResult
 from app.services import skills_service
 from app.services.csv_parsing import CsvFileError
 from tests.component.conftest import MockService
@@ -31,7 +31,7 @@ def test_lists_the_catalogue_with_employee_counts(
         "page": 1,
         "page_size": 10,
     }
-    list_skills.assert_called_once_with(session, SkillQuery(q="go", page_size=10))
+    list_skills.assert_called_once_with(session, NameQuery(q="go", page_size=10))
 
 
 def test_adds_a_skill_with_normalised_whitespace(

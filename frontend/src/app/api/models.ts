@@ -22,4 +22,5 @@ export type RowError = ImportRecord['row_errors'][number];
 export type Skill = Schemas['SkillRead'];
 export type SkillWithUsage = Schemas['SkillWithUsage'];
 export type SkillPage = Schemas['Page_SkillWithUsage_'];
+export type NamePage = Schemas['Page_DepartmentRead_'] | Schemas['Page_LocationRead_'];
 export type SkillImportResult = Schemas['SkillImportResult'];

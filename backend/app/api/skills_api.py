@@ -7,7 +7,7 @@ from app.api.imports_api import MAX_UPLOAD_BYTES
 from app.core.database import get_session
 from app.core.errors import problem_response
 from app.models import Skill
-from app.schemas import Page, SkillImportResult, SkillQuery, SkillRead, SkillWithUsage, SkillWrite
+from app.schemas import NameQuery, Page, SkillImportResult, SkillRead, SkillWithUsage, SkillWrite
 from app.services import skills_service
 from app.services.csv_parsing import CsvFileError
 
@@ -36,7 +36,7 @@ def _existing(session: Session, skill_id: int) -> Skill:
 
 
 @router.get("", summary="List the skill catalogue")
-def list_skills(session: SessionDep, query: Annotated[SkillQuery, Query()]) -> Page[SkillWithUsage]:
+def list_skills(session: SessionDep, query: Annotated[NameQuery, Query()]) -> Page[SkillWithUsage]:
     """Alphabetically, with how many employees have each skill; `q` narrows the list down,
     e.g. for autocompletion, ignoring case, spaces and punctuation."""
     rows, total = skills_service.list_skills(session, query)

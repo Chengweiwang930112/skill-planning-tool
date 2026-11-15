@@ -56,6 +56,35 @@ class Base(DeclarativeBase):
     )
 
 
+def name_key(name: str) -> str:
+    """What makes two names the same name, for skills, departments and locations: case,
+    spaces and punctuation do not count, so Node.js, NodeJS and node js are one skill. + and
+    # are spelled out first, so that C, C++ and C# stay three skills."""
+    spelled = name.casefold().replace("+", "plus").replace("#", "sharp")
+    return "".join(character for character in spelled if character.isalnum())
+
+
+class _Named:
+    """A name that exists once, whatever its spelling, as told by its key."""
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str]
+    key: Mapped[str] = mapped_column(unique=True)
+
+    @validates("name")
+    def _derive_key(self, _: str, name: str) -> str:
+        self.key = name_key(name)
+        return name
+
+
+class Department(_Named, Base):
+    __tablename__ = "department"
+
+
+class Location(_Named, Base):
+    __tablename__ = "location"
+
+
 class Employee(Base):
     __tablename__ = "employee"
 
@@ -64,15 +93,17 @@ class Employee(Base):
     first_name: Mapped[str]
     last_name: Mapped[str]
     email: Mapped[str] = mapped_column(unique=True)
-    department: Mapped[str | None]
+    department_id: Mapped[int | None] = mapped_column(ForeignKey("department.id"), index=True)
     job_title: Mapped[str | None]
-    location: Mapped[str | None]
+    location_id: Mapped[int | None] = mapped_column(ForeignKey("location.id"), index=True)
     hire_date: Mapped[date | None]
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
+    department: Mapped[Department | None] = relationship(lazy="joined")
+    location: Mapped[Location | None] = relationship(lazy="joined")
     skills: Mapped[list["EmployeeSkill"]] = relationship(
         back_populates="employee",
         cascade="all, delete-orphan",
@@ -81,25 +112,8 @@ class Employee(Base):
     )
 
 
-def skill_key(name: str) -> str:
-    """What makes two skill names the same skill: case, spaces and punctuation do not
-    count, so Node.js, NodeJS and node js are one skill. + and # are spelled out first,
-    so that C, C++ and C# stay three skills."""
-    spelled = name.casefold().replace("+", "plus").replace("#", "sharp")
-    return "".join(character for character in spelled if character.isalnum())
-
-
-class Skill(Base):
+class Skill(_Named, Base):
     __tablename__ = "skill"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str]
-    key: Mapped[str] = mapped_column(unique=True)
-
-    @validates("name")
-    def _derive_key(self, _: str, name: str) -> str:
-        self.key = skill_key(name)
-        return name
 
 
 class EmployeeSkill(Base):

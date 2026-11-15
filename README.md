@@ -216,6 +216,22 @@ free text.
 | `POST /api/v1/skills/import`        | add the names from a CSV file                                 |
 | `PUT /api/v1/employees/{id}/skills` | set an employee's skills by `skill_id`; unknown ids are `422` |
 
+## Departments and locations
+
+Departments and locations are records of their own, which employees refer to
+([ADR 0011](docs/adr/0011-departments-and-locations.md)). An import adds the
+ones it has not seen; names that differ only in case, spaces or punctuation are
+the same, as for skills, and the first spelling stays.
+
+They filter the employee list: `GET /api/v1/employees?department=Mobility&department=Healthineers&location=Munich`
+keeps the employees in any of the departments and at any of the locations, by
+name, combined with the skill criteria and `q`. `GET /api/v1/departments?q=` and
+`GET /api/v1/locations?q=` find them by part of their name. On the home page they
+are under **Filters**, below the skills in the search band, as they narrow down
+the same search of all employees: a panel to choose several departments and
+locations from those the database has, applied with **Apply**, and shown next to
+it as removable filters.
+
 ## Searching by skill
 
 "Who knows Kubernetes at an advanced level?" is a filter on the employee list:
@@ -229,7 +245,7 @@ GET /api/v1/employees?skill=kubernetes:advanced
 to require several skills at once, e.g.
 `?skill=kubernetes:advanced&skill=python:intermediate`. Skill names are matched
 like in the catalogue, ignoring case, spaces and punctuation, a misspelt level is rejected rather than matching nobody, and
-the filter combines with `q`, `department`, sorting and paging.
+the filter combines with `q`, `department`, `location`, sorting and paging.
 
 Levels are stored as integers (1 = beginner … 4 = expert), so "or higher" is a
 plain `level >= 3`, answered from the `(skill_id, level)` index.
@@ -244,9 +260,9 @@ plain `level >= 3`, answered from the `(skill_id, level)` index.
 | `first_name`      | yes      |                                               |
 | `last_name`       | yes      |                                               |
 | `email`           | yes      | unique, stored in lower case                  |
-| `department`      | no       |                                               |
+| `department`      | no       | added to the departments if new               |
 | `job_title`       | no       |                                               |
-| `location`        | no       |                                               |
+| `location`        | no       | added to the locations if new                 |
 | `hire_date`       | no       | `YYYY-MM-DD` or `DD.MM.YYYY`                  |
 
 Column names are matched ignoring case and spaces (`Employee Number` works).

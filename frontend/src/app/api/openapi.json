@@ -70,21 +70,41 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Exact department, case-insensitive.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 20,
+              "description": "Employees in any of these departments (`GET /departments`). Repeat the parameter for several; names are matched ignoring case, spaces and punctuation.",
               "examples": [
-                "Digital Industries"
+                [
+                  "Digital Industries",
+                  "Mobility"
+                ]
               ],
               "title": "Department"
             },
-            "description": "Exact department, case-insensitive."
+            "description": "Employees in any of these departments (`GET /departments`). Repeat the parameter for several; names are matched ignoring case, spaces and punctuation."
+          },
+          {
+            "name": "location",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 20,
+              "description": "Employees at any of these locations (`GET /locations`), like `department`.",
+              "examples": [
+                [
+                  "Munich"
+                ]
+              ],
+              "title": "Location"
+            },
+            "description": "Employees at any of these locations (`GET /locations`), like `department`."
           },
           {
             "name": "skill",
@@ -879,6 +899,168 @@
         }
       }
     },
+    "/api/v1/departments": {
+      "get": {
+        "tags": [
+          "departments and locations"
+        ],
+        "summary": "List departments",
+        "description": "The departments employees have been imported with, alphabetically; `q` narrows them\ndown, ignoring case, spaces and punctuation. For filtering employees by department.",
+        "operationId": "list_departments_api_v1_departments_get",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "1-based page number.",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "1-based page number."
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Items per page (max 100).",
+              "default": 20,
+              "title": "Page Size"
+            },
+            "description": "Items per page (max 100)."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Part of the name, ignoring case, spaces and punctuation.",
+              "title": "Q"
+            },
+            "description": "Part of the name, ignoring case, spaces and punctuation."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_DepartmentRead_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/locations": {
+      "get": {
+        "tags": [
+          "departments and locations"
+        ],
+        "summary": "List locations",
+        "description": "The locations employees have been imported with, like `GET /departments`.",
+        "operationId": "list_locations_api_v1_locations_get",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "1-based page number.",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "1-based page number."
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Items per page (max 100).",
+              "default": 20,
+              "title": "Page Size"
+            },
+            "description": "Items per page (max 100)."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Part of the name, ignoring case, spaces and punctuation.",
+              "title": "Q"
+            },
+            "description": "Part of the name, ignoring case, spaces and punctuation."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_LocationRead_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/healthz": {
       "get": {
         "tags": [
@@ -963,6 +1145,30 @@
           "file"
         ],
         "title": "Body_import_skills_api_v1_skills_import_post"
+      },
+      "DepartmentRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "examples": [
+              3
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "examples": [
+              "Digital Industries"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "DepartmentRead"
       },
       "EmployeeRead": {
         "properties": {
@@ -1371,6 +1577,71 @@
         ],
         "title": "InvalidParam"
       },
+      "LocationRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "examples": [
+              5
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "examples": [
+              "Munich"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "LocationRead"
+      },
+      "Page_DepartmentRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DepartmentRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Number of matching items across all pages.",
+            "examples": [
+              42
+            ]
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page",
+            "examples": [
+              1
+            ]
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size",
+            "examples": [
+              20
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Page[DepartmentRead]"
+      },
       "Page_EmployeeRead_": {
         "properties": {
           "items": {
@@ -1452,6 +1723,47 @@
           "page_size"
         ],
         "title": "Page[ImportSummary]"
+      },
+      "Page_LocationRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LocationRead"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Number of matching items across all pages.",
+            "examples": [
+              42
+            ]
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page",
+            "examples": [
+              1
+            ]
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size",
+            "examples": [
+              20
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Page[LocationRead]"
       },
       "Page_SkillWithUsage_": {
         "properties": {
@@ -1819,6 +2131,10 @@
     {
       "name": "imports",
       "description": "Upload employees as CSV and review past imports."
+    },
+    {
+      "name": "departments and locations",
+      "description": "As employees have been imported with them, for filtering employees."
     },
     {
       "name": "infrastructure",

@@ -4,9 +4,10 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from app.models import ImportStatus, ProficiencyLevel
+from app.models import Department, ImportStatus, Location, ProficiencyLevel
 from app.schemas import (
     EmployeeQuery,
+    EmployeeRead,
     EmployeeSkillsWrite,
     ImportSummary,
     PageQuery,
@@ -17,6 +18,7 @@ from app.schemas import (
     SkillWrite,
     parse_skill_criterion,
 )
+from tests.factories import make_employee
 
 BEGINNER, INTERMEDIATE, ADVANCED, EXPERT = ProficiencyLevel
 
@@ -178,3 +180,22 @@ def test_an_import_summary_counts_all_rows() -> None:
 
     # Then
     assert body["rows_total"] == 13
+
+
+def test_an_employee_shows_the_names_of_their_department_and_location() -> None:
+    # Given
+    employee = make_employee(id=1, department=Department(name="Mobility"), location=None)
+    employee.location = Location(name="Zug")
+
+    # When
+    read = EmployeeRead.model_validate(employee)
+
+    # Then
+    assert (read.department, read.location) == ("Mobility", "Zug")
+
+
+@pytest.mark.parametrize("field", ["department", "location"])
+def test_an_employee_query_takes_at_most_twenty_departments_or_locations(field: str) -> None:
+    # When / Then
+    with pytest.raises(ValidationError):
+        EmployeeQuery.model_validate({field: [f"Name {n}" for n in range(21)]})

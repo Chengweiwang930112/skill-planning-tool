@@ -4,15 +4,23 @@ from sqlalchemy import Select, delete, func, literal_column, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import InstrumentedAttribute, Session, selectinload
 
-from app.models import Employee, EmployeeSkill, ProficiencyLevel, Skill, skill_key
+from app.models import (
+    Department,
+    Employee,
+    EmployeeSkill,
+    Location,
+    ProficiencyLevel,
+    Skill,
+    name_key,
+)
 from app.schemas import EmployeeQuery, SkillLevelWrite
 
 SORTABLE: dict[str, InstrumentedAttribute[object]] = {
     "last_name": Employee.last_name,
     "first_name": Employee.first_name,
     "employee_number": Employee.employee_number,
-    "department": Employee.department,
-    "location": Employee.location,
+    "department": Department.name,
+    "location": Location.name,
     "hire_date": Employee.hire_date,
 }
 
@@ -30,7 +38,11 @@ def _filtered(query: EmployeeQuery) -> Select[Employee]:
             )
         )
     if query.department:
-        statement = statement.where(func.lower(Employee.department) == query.department.lower())
+        keys = [name_key(name) for name in query.department]
+        statement = statement.where(Employee.department.has(Department.key.in_(keys)))
+    if query.location:
+        keys = [name_key(name) for name in query.location]
+        statement = statement.where(Employee.location.has(Location.key.in_(keys)))
     for criterion in query.skill_criteria:
         # Served by the (skill_id, level) index on employee_skill.
         statement = statement.where(
@@ -38,7 +50,7 @@ def _filtered(query: EmployeeQuery) -> Select[Employee]:
                 select(EmployeeSkill.employee_id)
                 .join(Skill)
                 .where(
-                    Skill.key == skill_key(criterion.name),
+                    Skill.key == name_key(criterion.name),
                     EmployeeSkill.level >= criterion.min_level,
                 )
             )
@@ -53,7 +65,10 @@ def list_employees(session: Session, query: EmployeeQuery) -> tuple[Sequence[Emp
     column = SORTABLE[query.sort.removeprefix("-")]
     order = column.desc() if query.sort.startswith("-") else column.asc()
     employees = session.scalars(
-        statement.options(selectinload(Employee.skills))
+        # Joined for sorting by their names; employees without one stay in, sorted last.
+        statement.outerjoin(Department, Employee.department_id == Department.id)
+        .outerjoin(Location, Employee.location_id == Location.id)
+        .options(selectinload(Employee.skills))
         .order_by(order.nulls_last(), Employee.id)
         .limit(query.page_size)
         .offset((query.page - 1) * query.page_size)

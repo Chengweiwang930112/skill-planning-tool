@@ -75,7 +75,8 @@ def test_passes_search_filters_and_sorting_to_the_service(
         URL,
         params={
             "q": "schmidt",
-            "department": "Mobility",
+            "department": ["Mobility", "Healthineers"],
+            "location": "Munich",
             "skill": ["kubernetes:advanced", "python"],
             "sort": "-hire_date",
         },
@@ -86,7 +87,8 @@ def test_passes_search_filters_and_sorting_to_the_service(
         session,
         EmployeeQuery(
             q="schmidt",
-            department="Mobility",
+            department=["Mobility", "Healthineers"],
+            location=["Munich"],
             skill=["kubernetes:advanced", "python"],
             sort="-hire_date",
         ),
@@ -329,5 +331,5 @@ def test_openapi_documents_problem_details_instead_of_the_default_error(
         "$ref": "#/components/schemas/ProblemDetail"
     }
     assert {p["name"] for p in list_operation["parameters"]} == {
-        "q", "department", "skill", "sort", "page", "page_size"
+        "q", "department", "location", "skill", "sort", "page", "page_size"
     }  # fmt: skip

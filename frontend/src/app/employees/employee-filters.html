@@ -1,0 +1,53 @@
+<div class="filters-bar d-flex flex-wrap align-items-center gap-4">
+  <button
+    type="button"
+    class="btn btn-secondary"
+    aria-controls="employee-filters"
+    [attr.aria-expanded]="open()"
+    (click)="toggle()"
+  >
+    <i class="icon element-filter" aria-hidden="true"></i>
+    Filters
+    @if (count()) {
+      <span class="count" [attr.aria-label]="count() + ' active'">{{ count() }}</span>
+    }
+  </button>
+  <ng-content />
+</div>
+
+@if (open()) {
+  <div id="employee-filters" class="filters-panel" role="group" aria-label="Filters">
+    <div class="field">
+      <span id="filter-department" class="form-label">Department</span>
+      <si-select
+        multi
+        hasFilter
+        class="form-control"
+        labelledby="filter-department"
+        placeholder="Any department"
+        filterPlaceholder="Search departments"
+        [optionSource]="departments"
+        [value]="department()"
+        (valueChange)="department.set($event)"
+      />
+    </div>
+    <div class="field">
+      <span id="filter-location" class="form-label">Location</span>
+      <si-select
+        multi
+        hasFilter
+        class="form-control"
+        labelledby="filter-location"
+        placeholder="Any location"
+        filterPlaceholder="Search locations"
+        [optionSource]="locations"
+        [value]="location()"
+        (valueChange)="location.set($event)"
+      />
+    </div>
+    <div class="actions d-flex gap-4">
+      <button type="button" class="btn btn-tertiary" (click)="clear()">Clear</button>
+      <button type="button" class="btn btn-primary" (click)="apply()">Apply</button>
+    </div>
+  </div>
+}

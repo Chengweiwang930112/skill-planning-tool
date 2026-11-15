@@ -6,8 +6,9 @@ from sqlalchemy import String, any_, func, literal, select, text
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Session
 
-from app.models import Employee, EmployeeImport, ImportStatus
+from app.models import Department, Employee, EmployeeImport, ImportStatus, Location, name_key
 from app.services.csv_parsing import CsvFileError, ParsedRow, RowError, parse_employee_csv
+from app.services.lookups_service import ids_by_key
 
 # Imports are serialised: two concurrent uploads creating the same employee number
 # would otherwise race between the existence check and the insert.
@@ -85,12 +86,21 @@ def _upsert(
         )
     }
 
+    accepted = []
     for parsed in rows:
-        values = parsed.employee.model_dump()
         owner = email_owners.get(parsed.employee.email)
         if owner is not None and owner != parsed.employee.employee_number:
             errors.append(RowError(parsed.row, "email", f"Email belongs to employee {owner}"))
-            continue
+        else:
+            accepted.append(parsed)
+
+    # Departments and locations new to the database are added; rows that failed add none.
+    departments = ids_by_key(session, Department, (p.employee.department for p in accepted))
+    locations = ids_by_key(session, Location, (p.employee.location for p in accepted))
+    for parsed in accepted:
+        values = parsed.employee.model_dump()
+        values["department_id"] = _id_of(departments, values.pop("department"))
+        values["location_id"] = _id_of(locations, values.pop("location"))
 
         employee = existing.get(parsed.employee.employee_number)
         if employee is None:
@@ -102,6 +112,10 @@ def _upsert(
             for name, value in values.items():
                 setattr(employee, name, value)
             record.rows_updated += 1
+
+
+def _id_of(ids: dict[str, int], name: str | None) -> int | None:
+    return ids.get(name_key(name)) if name else None
 
 
 def list_imports(

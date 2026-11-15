@@ -107,7 +107,8 @@ def test_imports_a_german_excel_export(client: TestClient, session: Session) -> 
     assert (record["status"], record["rows_created"]) == ("succeeded", 4)
     employee = session.scalar(select(Employee).where(Employee.employee_number == "E-2001"))
     assert employee is not None
-    assert (employee.first_name, employee.last_name, employee.location) == (
+    assert employee.location is not None
+    assert (employee.first_name, employee.last_name, employee.location.name) == (
         "Jürgen",
         "Weiß",
         "München",

@@ -3,8 +3,9 @@ from unittest.mock import MagicMock
 import pytest
 
 from app.models import Employee, EmployeeImport, ImportStatus
+from app.services import import_service
 from app.services.import_service import IMPORT_LOCK_KEY, import_employees
-from tests.component.conftest import DIALECT
+from tests.component.conftest import DIALECT, MockService
 from tests.factories import make_employee
 
 HEADER = "employee_number,first_name,last_name,email,job_title"
@@ -154,3 +155,28 @@ def test_a_file_whose_rows_all_fail_is_a_failed_import(session: MagicMock) -> No
         0,
         2,
     )
+
+
+def test_gives_employees_their_department_and_location_from_the_file(
+    session: MagicMock, mock_service: MockService
+) -> None:
+    # Given
+    given_the_database_has(session, email_owners=[("j@example.com", "E-9")])
+    ids_by_key = mock_service(
+        import_service, "ids_by_key", side_effect=[{"mobility": 3}, {"munich": 5}]
+    )
+    content = (
+        "employee_number,first_name,last_name,email,department,location\n"
+        "E-1,Anna,Schmidt,a@example.com,Mobility,Munich\n"
+        "E-2,Jonas,Fischer,j@example.com,Healthineers,Erlangen\n"
+    )
+
+    # When
+    import_employees(session, "team.csv", content.encode())
+
+    # Then
+    [anna] = added(session, Employee)
+    assert (anna.department_id, anna.location_id) == (3, 5)
+    departments, locations = (list(call.args[2]) for call in ids_by_key.call_args_list)
+    # Jonas's row fails for his email, so his department and location are not added.
+    assert (departments, locations) == (["Mobility"], ["Munich"])

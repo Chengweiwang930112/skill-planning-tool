@@ -196,6 +196,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/departments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List departments
+         * @description The departments employees have been imported with, alphabetically; `q` narrows them
+         *     down, ignoring case, spaces and punctuation. For filtering employees by department.
+         */
+        get: operations["list_departments_api_v1_departments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List locations
+         * @description The locations employees have been imported with, like `GET /departments`.
+         */
+        get: operations["list_locations_api_v1_locations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/healthz": {
         parameters: {
             query?: never;
@@ -251,6 +292,19 @@ export interface components {
              * @description CSV with a `name` column; UTF-8 or Windows-1252.
              */
             file: string;
+        };
+        /** DepartmentRead */
+        DepartmentRead: {
+            /**
+             * Id
+             * @example 3
+             */
+            id: number;
+            /**
+             * Name
+             * @example Digital Industries
+             */
+            name: string;
         };
         /** EmployeeRead */
         EmployeeRead: {
@@ -462,6 +516,40 @@ export interface components {
              */
             reason: string;
         };
+        /** LocationRead */
+        LocationRead: {
+            /**
+             * Id
+             * @example 5
+             */
+            id: number;
+            /**
+             * Name
+             * @example Munich
+             */
+            name: string;
+        };
+        /** Page[DepartmentRead] */
+        Page_DepartmentRead_: {
+            /** Items */
+            items: components["schemas"]["DepartmentRead"][];
+            /**
+             * Total
+             * @description Number of matching items across all pages.
+             * @example 42
+             */
+            total: number;
+            /**
+             * Page
+             * @example 1
+             */
+            page: number;
+            /**
+             * Page Size
+             * @example 20
+             */
+            page_size: number;
+        };
         /** Page[EmployeeRead] */
         Page_EmployeeRead_: {
             /** Items */
@@ -487,6 +575,27 @@ export interface components {
         Page_ImportSummary_: {
             /** Items */
             items: components["schemas"]["ImportSummary"][];
+            /**
+             * Total
+             * @description Number of matching items across all pages.
+             * @example 42
+             */
+            total: number;
+            /**
+             * Page
+             * @example 1
+             */
+            page: number;
+            /**
+             * Page Size
+             * @example 20
+             */
+            page_size: number;
+        };
+        /** Page[LocationRead] */
+        Page_LocationRead_: {
+            /** Items */
+            items: components["schemas"]["LocationRead"][];
             /**
              * Total
              * @description Number of matching items across all pages.
@@ -694,8 +803,10 @@ export interface operations {
                 page_size?: number;
                 /** @description Case-insensitive match on full name, email or employee number. */
                 q?: string | null;
-                /** @description Exact department, case-insensitive. */
-                department?: string | null;
+                /** @description Employees in any of these departments (`GET /departments`). Repeat the parameter for several; names are matched ignoring case, spaces and punctuation. */
+                department?: string[];
+                /** @description Employees at any of these locations (`GET /locations`), like `department`. */
+                location?: string[];
                 /** @description `name:level` keeps employees who have the skill at that level **or higher**; `name` alone accepts any level. Repeat the parameter to require several skills. Skill names are matched ignoring case. */
                 skill?: string[];
                 /** @description Field to sort by; prefix `-` for descending. */
@@ -1227,6 +1338,78 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Invalid parameters */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    list_departments_api_v1_departments_get: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page (max 100). */
+                page_size?: number;
+                /** @description Part of the name, ignoring case, spaces and punctuation. */
+                q?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_DepartmentRead_"];
+                };
+            };
+            /** @description Invalid parameters */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    list_locations_api_v1_locations_get: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page (max 100). */
+                page_size?: number;
+                /** @description Part of the name, ignoring case, spaces and punctuation. */
+                q?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_LocationRead_"];
                 };
             };
             /** @description Invalid parameters */

@@ -10,6 +10,7 @@ from app import __version__
 from app.api.employees_api import router as employees_router
 from app.api.health_api import router as health_router
 from app.api.imports_api import router as imports_router
+from app.api.lookups_api import router as lookups_router
 from app.api.skills_api import router as skills_router
 from app.core.config import Settings, get_settings
 from app.core.errors import register_error_handlers
@@ -20,6 +21,10 @@ OPENAPI_TAGS = [
     {"name": "employees", "description": "Employees and the skills assigned to them."},
     {"name": "skills", "description": "The catalogue of skills employees can be assigned."},
     {"name": "imports", "description": "Upload employees as CSV and review past imports."},
+    {
+        "name": "departments and locations",
+        "description": "As employees have been imported with them, for filtering employees.",
+    },
     {"name": "infrastructure", "description": "Health probes for the load balancer."},
 ]
 
@@ -55,6 +60,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(employees_router, prefix=settings.api_v1_prefix)
     app.include_router(skills_router, prefix=settings.api_v1_prefix)
     app.include_router(imports_router, prefix=settings.api_v1_prefix)
+    app.include_router(lookups_router, prefix=settings.api_v1_prefix)
     app.include_router(health_router)
     # Mounted last, so that it only receives what no route matched.
     if settings.static_dir:
