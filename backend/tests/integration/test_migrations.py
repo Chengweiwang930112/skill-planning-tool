@@ -6,7 +6,7 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, text
 
-from tests.conftest import TEST_DATABASE_URL
+from tests.integration.conftest import TEST_DATABASE_URL
 
 
 def run_sql(*statements: str) -> list[tuple[object, ...]]:
@@ -33,10 +33,13 @@ def before_skill_keys(alembic_config: Config, migrated_database: None) -> Iterat
 
 @pytest.mark.usefixtures("before_skill_keys")
 def test_skill_keys_are_filled_in_for_existing_skills(alembic_config: Config) -> None:
+    # Given
     run_sql("INSERT INTO skill (name) VALUES ('Node.js'), ('C++'), ('C#'), ('C')")
 
+    # When
     command.upgrade(alembic_config, "head")
 
+    # Then
     assert run_sql("SELECT name, key FROM skill ORDER BY name") == [
         ("C", "c"),
         ("C#", "csharp"),
@@ -47,8 +50,10 @@ def test_skill_keys_are_filled_in_for_existing_skills(alembic_config: Config) ->
 
 @pytest.mark.usefixtures("before_skill_keys")
 def test_skill_keys_are_not_added_while_skills_would_clash(alembic_config: Config) -> None:
+    # Given
     run_sql("INSERT INTO skill (name) VALUES ('Node.js'), ('NodeJS'), ('Go')")
 
+    # When / Then
     with pytest.raises(
         RuntimeError, match=re.escape("rename or remove them first: Node.js = NodeJS")
     ):

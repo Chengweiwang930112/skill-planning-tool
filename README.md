@@ -75,6 +75,7 @@ make up        # or: everything as containers, built from the image, on :8080
 make stop      # stop backend, frontend and all containers (data is kept)
 make restart
 make clean     # stop, then delete the containers and the database data
+make test      # all tests with coverage reports, against a throwaway database
 ```
 
 The `Makefile` is for Windows and runs its commands in cmd, so it works the
@@ -278,34 +279,65 @@ pipeline.
 | Types            | `uv run mypy`           | part of `npm run build` |
 | Tests + coverage | `uv run pytest`         | `npm run test:ci`     |
 
-Both suites fail below 80% coverage. The backend tests need the database
-from `docker compose up -d db`.
+Both suites fail below 80% coverage. Only the backend's integration tests need
+the database, from `docker compose up -d db`.
+
+### Test layers
+
+The backend's tests are split by what they put together
+([ADR 0010](docs/adr/0010-test-layers.md)):
+
+| Folder              | Tests                                                                                      | Needs    |
+| ------------------- | ------------------------------------------------------------------------------------------ | -------- |
+| `tests/unit`        | functions on their own: parsing, validation, skill keys                                    | nothing  |
+| `tests/component`   | the routers with mocked services, the services with a mocked session and the SQL they send | nothing  |
+| `tests/integration` | requests through the HTTP API into PostgreSQL, the schema and the migrations               | database |
+
+One layer runs on its own with, for example,
+`uv run pytest tests/unit --cov-fail-under=0` (locally, the 80% threshold
+applies to all layers together); its coverage shows how much code that layer
+tests by itself. In CI the three layers are separate jobs, and the coverage that
+counts — the 80% threshold and the report for SonarQube — is that of the unit
+and component tests only, combined: integration tests run too much code at
+once for their coverage to mean much. Every test is written as Given / When / Then, marked with comments; the
+frontend's specs follow the same structure, next to the code they test as
+Angular expects.
+
+`make test` runs both suites at once, against a database of its own (`test-db`,
+port 5433, in memory) that it removes afterwards, even when tests fail, so it
+never touches the development database. Besides the summary in the terminal,
+it writes HTML coverage reports to `backend/htmlcov/index.html` and
+`frontend/coverage/frontend/lcov-report/index.html`, plus `backend/coverage.xml`
+(Cobertura) and `frontend/coverage/frontend/lcov.info` for other tools.
 
 ## CI/CD
 
 One workflow, [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml),
-runs five stages. GitHub Actions has no stage keyword: a stage is the jobs
+runs six stages. GitHub Actions has no stage keyword: a stage is the jobs
 that share the same `needs`, so they run in parallel, and the next stage starts
 once all of them have passed.
 
 ```mermaid
 flowchart LR
     lint["Lint<br/>backend · frontend"] --> test["Test<br/>backend · frontend"]
-    test --> build["Build image<br/>smoke test · Trivy scan"]
+    test --> gate["Quality gate<br/>SonarQube (simulated)"]
+    gate --> build["Build image<br/>smoke test · Trivy scan"]
     build --> push["Push to ECR<br/>(simulated)"]
     push --> approve{{"Manual approval"}}
     approve --> deploy["Deploy to ECS<br/>(simulated)"]
 ```
 
-| Stage         | Runs                                                                                         |
-| ------------- | -------------------------------------------------------------------------------------------- |
-| Lint          | backend: ruff, ruff format, mypy · frontend: ESLint, Prettier, TypeScript compiler           |
-| Test          | backend: `alembic check`, pytest against PostgreSQL · frontend: Vitest, API types up to date |
-| Build image   | the root `Dockerfile`, started like `make up`; smoke test; [Trivy](https://trivy.dev) scan   |
-| Push to ECR   | prints what it would push (simulated)                                                        |
-| Deploy to ECS | after a manual approval, prints what it would deploy (simulated)                             |
+| Stage         | Runs                                                                                                                   |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Lint          | backend: ruff, ruff format, mypy · frontend: ESLint, Prettier, TypeScript compiler                                     |
+| Test          | backend: unit, component and integration tests as three jobs, `alembic check` · frontend: Vitest, API types up to date |
+| Quality gate  | backend unit + component coverage combined, at least 80%; SonarQube with it and the frontend's (simulated)             |
+| Build image   | the root `Dockerfile`, started like `make up`; smoke test; [Trivy](https://trivy.dev) scan                             |
+| Push to ECR   | prints what it would push (simulated)                                                                                  |
+| Deploy to ECS | after a manual approval, prints what it would deploy (simulated)                                                       |
 
-Pull requests run lint, test and build; pushes to `main` run all five stages.
+Pull requests run lint, test, quality gate and build; pushes to `main` run all
+six stages.
 The deployment waits for a click: the job uses the `production` environment,
 and the run pauses at **Review deployments** until a reviewer approves. That
 rule lives in the repository settings, not in the workflow — *Settings →
@@ -314,8 +346,20 @@ add yourself (optionally **Prevent self-review** for a second pair of eyes, and
 *Deployment branches* limited to `main`). Without it, the deployment runs
 straight after the push.
 
-The last two are placeholders, as there is no AWS account for this project:
-they show where the image would be pushed and deployed, and do nothing.
+The quality gate combines the coverage of the backend's unit and component
+tests and fails below 80% — that part is real. The SonarQube analysis is a
+placeholder, as there is no SonarQube server: it shows where it would run. With a
+server it becomes SonarQube's scan action (`SONAR_TOKEN`, `SONAR_HOST_URL`),
+which analyses the Python and TypeScript code together, imports the coverage
+of `backend/coverage.xml` (Cobertura, from coverage.py; unit and component
+tests) and
+`frontend/coverage/frontend/lcov.info` (LCOV, from Vitest), and fails the
+pipeline when the quality gate fails (`sonar.qualitygate.wait`). The coverage
+reports of every run can be downloaded from its summary page.
+
+The last two stages are placeholders, as there is no AWS account for this
+project: they show where the image would be pushed and deployed, and do
+nothing.
 [ADR 0008](docs/adr/0008-ci-cd.md) describes what they would do for real —
 OIDC instead of stored AWS keys, migrations as a one-off ECS task before the
 rollout — and the infrastructure they need.

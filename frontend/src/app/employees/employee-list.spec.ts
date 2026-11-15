@@ -103,11 +103,16 @@ describe('EmployeeList', () => {
   }
 
   it('requests the first page sorted by last name and renders the employees', async () => {
+    // When
     const request = await open('/employees');
 
+    // Then
     expect(request.request.params.toString()).toBe('page=1&page_size=20&sort=last_name');
+
+    // When
     const view = await respond(request, page([anna]));
 
+    // Then
     const [name, ...cells] = [...view.querySelectorAll('tbody td')].map((cell) =>
       cell.textContent?.trim(),
     );
@@ -125,63 +130,85 @@ describe('EmployeeList', () => {
   });
 
   it('passes the search, sorting and page from the URL to the API', async () => {
+    // When
     const request = await open('/employees?q=anna&sort=-department&page=2');
 
+    // Then
     expect(request.request.params.toString()).toBe('page=2&page_size=20&sort=-department&q=anna');
     request.flush(page([anna], 21, 2));
   });
 
   it('sorts by a column and reverses the order on a second click', async () => {
+    // Given
     const view = await respond(await open('/employees'), page([anna]));
     const department = () =>
       [...view.querySelectorAll('th')].find((th) => th.textContent?.includes('Department'))!;
     expect(department().getAttribute('aria-sort')).toBe('none');
 
+    // When
     department().querySelector('button')!.click();
     await respond(await nextRequest(), page([anna]));
 
+    // Then
     expect(currentUrl()).toBe('/employees?sort=department');
     expect(department().getAttribute('aria-sort')).toBe('ascending');
 
+    // When
     department().querySelector('button')!.click();
     await respond(await nextRequest(), page([anna]));
 
+    // Then
     expect(currentUrl()).toBe('/employees?sort=-department');
     expect(department().getAttribute('aria-sort')).toBe('descending');
   });
 
   it('starts again at the first page when the search changes', async () => {
+    // Given
     await respond(await open('/employees?page=2'), page([anna], 21, 2));
 
+    // When
     searchBar().searchChange.emit('schmidt');
     await respond(await nextRequest(), page([anna]));
 
+    // Then
     expect(currentUrl()).toBe('/employees?q=schmidt');
   });
 
   it('pages through the results only when there is more than one page', async () => {
+    // When
     let view = await respond(await open('/employees'), page([anna]));
+
+    // Then
     expect(view.querySelector('si-pagination')).toBeNull();
 
+    // When
     view = await respond(await open('/employees?sort=location'), page([anna], 45));
     paginator().currentPage.set(3);
     await respond(await nextRequest(), page([anna], 45, 3));
 
+    // Then
     expect(currentUrl()).toBe('/employees?sort=location&page=3');
     expect(view.querySelector('si-pagination')).not.toBeNull();
   });
 
   it('distinguishes an empty directory from a search without matches', async () => {
+    // When
     const empty = await respond(await open('/employees'), page([]));
+
+    // Then
     expect(empty.textContent).toContain('No employees yet');
     expect(empty.querySelector('a[href="/imports"]')?.textContent).toBe('Import employees');
 
+    // When
     const noMatch = await respond(await open('/employees?q=nobody'), page([]));
+
+    // Then
     expect(noMatch.textContent).toContain('No employees match your search');
     expect(noMatch.querySelector('a[href="/imports"]')).toBeNull();
   });
 
   it('shows the problem detail when loading fails and retries on request', async () => {
+    // When
     const request = await open('/employees?sort=salary');
     request.flush(
       { title: 'Unprocessable Entity', status: 422, detail: 'Invalid request parameters' },
@@ -189,11 +216,15 @@ describe('EmployeeList', () => {
     );
     await harness.fixture.whenStable();
     const view = harness.routeNativeElement as HTMLElement;
+
+    // Then
     expect(view.textContent).toContain('Invalid request parameters');
 
+    // When
     view.querySelector<HTMLButtonElement>('button.btn-secondary')!.click();
     await respond(await nextRequest(), page([anna]));
 
+    // Then
     expect(view.textContent).toContain('Schmidt, Anna');
   });
 
@@ -214,61 +245,75 @@ describe('EmployeeList', () => {
   }
 
   it('opens an employee in the side panel from the name', async () => {
+    // Given
     const view = await respond(await open('/employees?q=schmidt'), page([anna]));
     expect(sidePanel().collapsed()).toBe(true);
 
+    // When
     view.querySelector<HTMLAnchorElement>('tbody a')!.click();
     (await panelRequest(1)).flush(anna);
     await settle();
 
+    // Then
     expect(currentUrl()).toBe('/employees?q=schmidt&employee=1');
     expect(sidePanel().collapsed()).toBe(false);
     expect(view.querySelector('app-employee-panel h2')?.textContent).toBe('Anna Schmidt');
   });
 
   it('opens an employee from anywhere in the row and highlights the row', async () => {
+    // Given
     const view = await respond(await open('/employees'), page([anna]));
     const row = view.querySelector('tbody tr')!;
 
+    // When
     row.querySelectorAll('td')[2].click();
     (await panelRequest(1)).flush(anna);
     await settle();
 
+    // Then
     expect(currentUrl()).toBe('/employees?employee=1');
     expect(row.classList).toContain('table-active');
   });
 
   it('does not open the panel when the click ends a text selection', async () => {
+    // Given
     const view = await respond(await open('/employees'), page([anna]));
     const selection = vi
       .spyOn(window, 'getSelection')
       .mockReturnValue({ toString: () => 'anna' } as Selection);
 
+    // When
     view.querySelectorAll<HTMLElement>('tbody td')[1].click();
     await settle();
     selection.mockRestore();
 
+    // Then
     expect(currentUrl()).toBe('/employees');
   });
 
   it('still shows the list when the panel loads first', async () => {
+    // Given
     await harness.navigateByUrl('/employees?employee=1');
     const list = await nextRequest();
     (await panelRequest(1)).flush(anna);
     await settle();
 
+    // When
     const view = await respond(list, page([anna]));
 
+    // Then
     expect(view.querySelector('tbody')?.textContent).toContain('Schmidt, Anna');
   });
 
   it('shows edits made in the panel in the list', async () => {
+    // Given
     const list = await open('/employees?employee=1');
     (await panelRequest(1)).flush(anna);
     list.flush(page([anna]));
     await settle();
     const view = harness.routeNativeElement as HTMLElement;
 
+    // When
     const panel: EmployeePanel = harness.fixture.debugElement.query(
       By.directive(EmployeePanel),
     ).componentInstance;
@@ -276,34 +321,41 @@ describe('EmployeeList', () => {
     panel.changed.emit({ ...anna, id: 42 });
     await settle();
 
+    // Then
     const badges = [...view.querySelectorAll('tbody si-badge')].map((b) => b.textContent?.trim());
     expect(badges).toEqual(['Go · advanced']);
   });
 
   it('closes the panel by removing the employee from the URL', async () => {
+    // Given
     const list = await open('/employees?employee=1&page=2');
     (await panelRequest(1)).flush(anna);
     list.flush(page([anna], 30, 2));
     await settle();
 
+    // When
     sidePanel().closed.emit();
     await settle();
 
+    // Then
     expect(currentUrl()).toBe('/employees?page=2');
   });
 
   it('closes the panel when the panel asks to exit', async () => {
+    // Given
     const list = await open('/employees?employee=1');
     (await panelRequest(1)).flush(anna);
     list.flush(page([anna]));
     await settle();
 
+    // When
     const panel: EmployeePanel = harness.fixture.debugElement.query(
       By.directive(EmployeePanel),
     ).componentInstance;
     panel.exit.emit();
     await settle();
 
+    // Then
     expect(currentUrl()).toBe('/employees');
   });
 

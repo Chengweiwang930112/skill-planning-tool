@@ -1,9 +1,17 @@
+from datetime import UTC, datetime
 from itertools import count
 from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.models import Employee, EmployeeSkill, ProficiencyLevel, Skill
+from app.models import (
+    Employee,
+    EmployeeImport,
+    EmployeeSkill,
+    ImportStatus,
+    ProficiencyLevel,
+    Skill,
+)
 
 _sequence = count(1)
 
@@ -23,6 +31,24 @@ def make_employee(
         EmployeeSkill(skill=skill, level=level) for skill, level in (skills or {}).items()
     ]
     return employee
+
+
+def make_import(**overrides: Any) -> EmployeeImport:
+    fields: dict[str, Any] = {
+        "id": 3,
+        "filename": "employees.csv",
+        "status": ImportStatus.PARTIALLY_SUCCEEDED,
+        "rows_succeeded": 2,
+        "rows_failed": 1,
+        "rows_created": 1,
+        "rows_updated": 1,
+        "rows_unchanged": 0,
+        "error": None,
+        "file_sha256": "c0a7df61f764",
+        "created_at": datetime(2026, 11, 13, 9, 30, tzinfo=UTC),
+        "row_errors": [{"row": 3, "field": "first_name", "message": "is required"}],
+    }
+    return EmployeeImport(**(fields | overrides))
 
 
 def persist(session: Session, *objects: object) -> None:

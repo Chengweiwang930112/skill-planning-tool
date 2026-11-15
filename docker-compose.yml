@@ -1,5 +1,5 @@
 services:
-  db:
+  db: &postgres
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: skills
@@ -11,10 +11,22 @@ services:
       - db-data:/var/lib/postgresql/data
       - ./docker/postgres:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U skills -d skills"]
+      # Over TCP: while the init scripts run, PostgreSQL only listens on its socket.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U skills -d skills"]
       interval: 2s
       timeout: 3s
       retries: 15
+
+  # A throwaway database for `make test`: its own port, kept in memory, removed afterwards.
+  test-db:
+    <<: *postgres
+    profiles: [test]
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./docker/postgres:/docker-entrypoint-initdb.d:ro
+    tmpfs:
+      - /var/lib/postgresql/data
 
   # The containerised application; only started with `docker compose --profile app up`,
   # while `make start` runs just the database.

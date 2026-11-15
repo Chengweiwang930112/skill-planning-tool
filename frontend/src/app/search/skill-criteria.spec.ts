@@ -81,39 +81,51 @@ describe('SkillCriteria', () => {
   }
 
   it('searches for a typed catalogue skill with one click, at advanced by default', async () => {
+    // Given
     await render([]);
 
+    // When
     await type('apache kafka', 'advanced');
     await click('Search');
 
+    // Then
     expect(searches).toEqual([[{ name: 'Apache Kafka', level: 'advanced' }]]);
   });
 
   it('can always search, also with nothing changed or nothing entered', async () => {
+    // Given
     await render([]);
     expect(button('Search').disabled).toBe(false);
+
+    // When
     await click('Search');
 
     await render([{ name: 'Python' }]);
     await click('Search');
     await click('Search');
 
+    // Then
     expect(searches).toEqual([[], [{ name: 'Python' }], [{ name: 'Python' }]]);
   });
 
   it('searches with Enter too', async () => {
+    // Given
     await render([]);
     await type('Go', '');
 
+    // When
     view().querySelector('form')!.dispatchEvent(new Event('submit'));
     await settle();
 
+    // Then
     expect(searches).toEqual([[{ name: 'Go' }]]);
   });
 
   it('collects several skills and searches for them together', async () => {
+    // Given
     await render([]);
 
+    // When
     await type('Kubernetes', 'advanced');
     await click('Add skill');
     await type('Python', '');
@@ -121,16 +133,23 @@ describe('SkillCriteria', () => {
     await type('kubernetes', 'expert');
     await click('Add skill');
 
+    // Then
     expect(shownCriteria()).toEqual(['Kubernetes advanced', 'Python ']);
     expect(searches).toEqual([]);
+
+    // When
     await click('Search');
+
+    // Then
     expect(searches).toEqual([[{ name: 'Kubernetes', level: 'advanced' }, { name: 'Python' }]]);
   });
 
   it('changes or removes criteria in the draft until the next search', async () => {
+    // Given
     await render([{ name: 'Kubernetes', level: 'advanced' }, { name: 'Python' }, { name: 'Go' }]);
     const levels = view().querySelectorAll<HTMLSelectElement>('li select');
 
+    // When
     levels[1].value = 'expert';
     levels[1].dispatchEvent(new Event('change'));
     levels[0].value = '';
@@ -138,39 +157,52 @@ describe('SkillCriteria', () => {
     view().querySelector<HTMLButtonElement>('button[aria-label="Remove Go"]')!.click();
     await settle();
 
+    // Then
     expect(searches).toEqual([]);
     expect(shownCriteria()).toEqual(['Kubernetes ', 'Python expert']);
     expect(view().textContent).toContain('Press Search to update the results.');
+
+    // When
     await click('Search');
+
+    // Then
     expect(searches).toEqual([[{ name: 'Kubernetes' }, { name: 'Python', level: 'expert' }]]);
   });
 
   it('starts over from the criteria of new results', async () => {
+    // Given
     await render([{ name: 'Python' }]);
     view().querySelector<HTMLButtonElement>('button[aria-label="Remove Python"]')!.click();
     await settle();
 
+    // When
     await render([{ name: 'Go', level: 'expert' }]);
 
+    // Then
     expect(shownCriteria()).toEqual(['Go expert']);
     expect(view().textContent).not.toContain('Press Search');
   });
 
   it('accepts no more criteria than the API does', async () => {
+    // When
     await render(Array.from({ length: MAX_CRITERIA }, (_, i) => ({ name: `Skill ${i}` })));
 
+    // Then
     expect(view().querySelector<HTMLInputElement>('#criterion-skill')!.disabled).toBe(true);
     expect(button('Add skill').disabled).toBe(true);
     expect(view().textContent).toContain('At most 10 skills per search.');
   });
 
   it('never searches for a skill that is not in the catalogue', async () => {
+    // Given
     await render([{ name: 'Python' }]);
 
+    // When
     await type('Cobol', '');
     await click('Search');
     await click('Add skill');
 
+    // Then
     expect(searches).toEqual([]);
     expect(shownCriteria()).toEqual(['Python ']);
     expect(view().querySelector('[role=alert]')?.textContent).toContain(
@@ -180,11 +212,14 @@ describe('SkillCriteria', () => {
   });
 
   it('asks to choose a suggestion for partly typed names', async () => {
+    // Given
     await render([]);
 
+    // When
     await type('kube', '');
     await click('Search');
 
+    // Then
     expect(searches).toEqual([]);
     expect(view().querySelector('[role=alert]')?.textContent).toContain(
       'Choose a skill from the suggestions.',

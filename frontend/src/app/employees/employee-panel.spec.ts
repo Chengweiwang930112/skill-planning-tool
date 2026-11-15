@@ -142,6 +142,7 @@ describe('EmployeePanel', () => {
   }
 
   it('shows the employee and reports it as stored', () => {
+    // Then
     expect(view().querySelector('h2')?.textContent).toBe('Anna Schmidt');
     expect(view().querySelector('dl')?.textContent).toContain('E-1001');
     expect(view().querySelector('dl')?.textContent).toContain('—');
@@ -151,11 +152,13 @@ describe('EmployeePanel', () => {
   });
 
   it('collects edits without sending them', async () => {
+    // When
     await setLevel('Python', 'advanced');
     view().querySelector<HTMLButtonElement>('button[aria-label="Remove Kubernetes"]')!.click();
     await settle();
     await add('Terraform', 'expert');
 
+    // Then
     expect(shownSkills()).toEqual(['Python advanced', 'Terraform expert']);
     expect(status()).toBe('Unsaved changes');
     expect(button('Save').disabled).toBe(false);
@@ -164,11 +167,15 @@ describe('EmployeePanel', () => {
   });
 
   it('saves all edits in one request', async () => {
+    // Given
     await setLevel('Python', 'advanced');
     await add('apache kafka', 'beginner');
+
+    // When
     button('Save').click();
     await settle();
 
+    // Then
     expect(button('Saving…').disabled).toBe(true);
     const save = await request('PUT', '/api/v1/employees/1/skills');
     expect(save.request.body).toEqual({
@@ -178,6 +185,8 @@ describe('EmployeePanel', () => {
         { skill_id: 9, level: 'beginner' },
       ],
     });
+
+    // When
     const stored: Employee = {
       ...anna,
       skills: [
@@ -189,13 +198,17 @@ describe('EmployeePanel', () => {
     save.flush(stored);
     await settle();
 
+    // Then
     expect(changes.at(-1)).toEqual(stored);
     expect(status()).toBe('All changes saved');
     expect(button('Save').disabled).toBe(true);
   });
 
   it('keeps the draft when saving fails, so the user can retry', async () => {
+    // Given
     await setLevel('Python', 'expert');
+
+    // When
     button('Save').click();
 
     (await request('PUT', '/api/v1/employees/1/skills')).flush(
@@ -204,6 +217,7 @@ describe('EmployeePanel', () => {
     );
     await settle();
 
+    // Then
     expect(view().textContent).toContain('The changes were not saved.');
     expect(view().textContent).toContain('Invalid request parameters');
     expect(shownSkills()).toEqual(['Kubernetes expert', 'Python expert']);
@@ -211,30 +225,42 @@ describe('EmployeePanel', () => {
   });
 
   it('sees no change once an edit is undone by hand', async () => {
+    // Given
     await setLevel('Python', 'expert');
+
+    // When
     await setLevel('Python', 'beginner');
 
+    // Then
     expect(status()).toBe('');
     expect(button('Save').disabled).toBe(true);
   });
 
   it('changes the level when the added skill is already in the list', async () => {
+    // When
     await add('KUBERNETES', 'beginner');
 
+    // Then
     expect(shownSkills()).toEqual(['Kubernetes beginner', 'Python beginner']);
   });
 
   it('asks to exit without saving anything', async () => {
+    // Given
     await setLevel('Python', 'expert');
+
+    // When
     button('Exit').click();
 
+    // Then
     expect(exits).toBe(1);
     http.expectNone({ method: 'PUT', url: '/api/v1/employees/1/skills' });
   });
 
   it('only adds skills from the catalogue', async () => {
+    // When
     await add('Cobol', 'expert');
 
+    // Then
     expect(view().querySelector('[role=alert]')?.textContent).toContain(
       '“Cobol” is not in the skill catalogue.',
     );
@@ -245,6 +271,7 @@ describe('EmployeePanel', () => {
 
 describe('EmployeePanel without data', () => {
   it('shows why the employee could not be loaded', async () => {
+    // Given
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
@@ -253,6 +280,7 @@ describe('EmployeePanel without data', () => {
     fixture.componentRef.setInput('employeeId', 99);
     TestBed.tick();
 
+    // When
     http
       .expectOne('/api/v1/employees/99')
       .flush(
@@ -261,6 +289,7 @@ describe('EmployeePanel without data', () => {
       );
     await fixture.whenStable();
 
+    // Then
     expect((fixture.nativeElement as HTMLElement).textContent).toContain(
       'Employee 99 does not exist',
     );

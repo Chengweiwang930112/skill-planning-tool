@@ -34,20 +34,24 @@ describe('ImportDetail', () => {
   }
 
   it('shows the report of the import in the URL', async () => {
+    // When
     (await open(3)).flush(partialImport);
     await harness.fixture.whenStable();
 
+    // Then
     expect(harness.routeNativeElement?.textContent).toContain('employees-with-errors.csv');
     expect(harness.routeNativeElement?.textContent).toContain('2 of 9 rows imported.');
   });
 
   it('shows the problem when the import does not exist', async () => {
+    // When
     (await open(999)).flush(
       { title: 'Not Found', status: 404, detail: 'Import 999 does not exist' },
       { status: 404, statusText: 'Not Found' },
     );
     await harness.fixture.whenStable();
 
+    // Then
     expect(harness.routeNativeElement?.textContent).toContain('Import 999 does not exist');
   });
 });

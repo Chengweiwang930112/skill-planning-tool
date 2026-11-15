@@ -4,15 +4,26 @@ from pathlib import Path
 import pytest
 
 from app.services import csv_parsing
-from app.services.csv_parsing import CsvFileError, parse_employee_csv
+from app.services.csv_parsing import (
+    CsvFileError,
+    ParsedName,
+    RowError,
+    parse_employee_csv,
+    parse_skill_csv,
+)
 
-SAMPLES = Path(__file__).parents[2] / "samples"
+SAMPLES = Path(__file__).parents[3] / "samples"
 HEADER = "employee_number,first_name,last_name,email"
 
 
 def test_parses_the_sample_file() -> None:
-    parsed = parse_employee_csv((SAMPLES / "employees.csv").read_bytes())
+    # Given
+    content = (SAMPLES / "employees.csv").read_bytes()
 
+    # When
+    parsed = parse_employee_csv(content)
+
+    # Then
     assert parsed.errors == []
     assert len(parsed.rows) == 12
     last = parsed.rows[-1]
@@ -21,8 +32,13 @@ def test_parses_the_sample_file() -> None:
 
 
 def test_parses_a_german_excel_export() -> None:
-    parsed = parse_employee_csv((SAMPLES / "employees-excel-de.csv").read_bytes())
+    # Given
+    content = (SAMPLES / "employees-excel-de.csv").read_bytes()
 
+    # When
+    parsed = parse_employee_csv(content)
+
+    # Then
     assert parsed.errors == []
     assert [(r.employee.first_name, r.employee.last_name) for r in parsed.rows] == [
         ("Jürgen", "Weiß"),
@@ -36,8 +52,13 @@ def test_parses_a_german_excel_export() -> None:
 
 
 def test_reports_invalid_rows_with_their_line_numbers() -> None:
-    parsed = parse_employee_csv((SAMPLES / "employees-with-errors.csv").read_bytes())
+    # Given
+    content = (SAMPLES / "employees-with-errors.csv").read_bytes()
 
+    # When
+    parsed = parse_employee_csv(content)
+
+    # Then
     assert [(e.row, e.field) for e in parsed.errors] == [
         (3, "first_name"),
         (4, "email"),
@@ -50,27 +71,49 @@ def test_reports_invalid_rows_with_their_line_numbers() -> None:
 
 
 def test_normalises_values() -> None:
+    # Given
     content = f"{HEADER},department\n  E-1  , Anna ,Schmidt, Anna.Schmidt@Example.COM ,  \n"
 
+    # When
     [row] = parse_employee_csv(content.encode()).rows
 
+    # Then
     assert row.employee.employee_number == "E-1"
     assert row.employee.first_name == "Anna"
     assert row.employee.email == "anna.schmidt@example.com"
     assert row.employee.department is None
 
 
+def test_matches_column_names_ignoring_case_and_spaces() -> None:
+    # Given
+    content = b"Employee Number,First Name,LAST_NAME, Email \nE-1,Anna,Schmidt,a@example.com\n"
+
+    # When
+    parsed = parse_employee_csv(content)
+
+    # Then
+    assert [row.employee.employee_number for row in parsed.rows] == ["E-1"]
+
+
 def test_accepts_tab_separated_files() -> None:
+    # Given
     content = "employee_number\tfirst_name\tlast_name\temail\nE-1\tAnna\tSchmidt\ta@example.com\n"
 
-    assert len(parse_employee_csv(content.encode()).rows) == 1
+    # When
+    parsed = parse_employee_csv(content.encode())
+
+    # Then
+    assert len(parsed.rows) == 1
 
 
 def test_rejects_impossible_dates() -> None:
+    # Given
     content = f"{HEADER},hire_date\nE-1,Anna,Schmidt,a@example.com,31.02.2020\n"
 
+    # When
     [error] = parse_employee_csv(content.encode()).errors
 
+    # Then
     assert (error.row, error.field) == (2, "hire_date")
 
 
@@ -86,13 +129,64 @@ def test_rejects_impossible_dates() -> None:
     ids=["empty", "missing-columns", "duplicate-columns", "no-rows", "binary"],
 )
 def test_rejects_unusable_files(content: bytes, message: str) -> None:
+    # When / Then
     with pytest.raises(CsvFileError, match=f"^{message}$"):
         parse_employee_csv(content)
 
 
 def test_rejects_files_with_too_many_rows(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given
     monkeypatch.setattr(csv_parsing, "MAX_ROWS", 2)
     rows = "".join(f"E-{n},Anna,Schmidt,a{n}@example.com\n" for n in range(3))
 
+    # When / Then
     with pytest.raises(CsvFileError, match="more than 2 rows"):
         parse_employee_csv(f"{HEADER}\n{rows}".encode())
+
+
+def test_reads_skill_names_from_the_name_column() -> None:
+    # Given
+    content = "Category;Name\nCloud;  Apache   Kafka \n;\nWeb;Node.js\n".encode("cp1252")
+
+    # When
+    names, errors = parse_skill_csv(content)
+
+    # Then
+    assert names == [ParsedName(2, "Apache Kafka"), ParsedName(4, "Node.js")]
+    assert errors == []
+
+
+def test_reports_skill_names_that_are_too_long() -> None:
+    # Given
+    content = f"name\nGo\n{'x' * 101}\n".encode()
+
+    # When
+    names, errors = parse_skill_csv(content)
+
+    # Then
+    assert names == [ParsedName(2, "Go")]
+    assert errors == [RowError(3, "name", "String should have at most 100 characters")]
+
+
+@pytest.mark.parametrize(
+    ("content", "message"),
+    [
+        (b"", "The file is empty"),
+        (b"skill\nGo\n", "Missing required column: name"),
+        (b"name\n\n  \n", "The file has no skill names"),
+    ],
+    ids=["empty", "no-name-column", "no-names"],
+)
+def test_rejects_unusable_skill_files(content: bytes, message: str) -> None:
+    # When / Then
+    with pytest.raises(CsvFileError, match=f"^{message}$"):
+        parse_skill_csv(content)
+
+
+def test_rejects_skill_files_with_too_many_rows(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Given
+    monkeypatch.setattr(csv_parsing, "MAX_ROWS", 2)
+
+    # When / Then
+    with pytest.raises(CsvFileError, match="more than 2 rows"):
+        parse_skill_csv(b"name\nGo\nRust\nZig\n")

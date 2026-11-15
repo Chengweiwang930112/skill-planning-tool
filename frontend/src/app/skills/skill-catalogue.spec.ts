@@ -97,18 +97,24 @@ describe('SkillCatalogue', () => {
     ] as const;
 
   it('lists the skills with how many employees have them', () => {
+    // Then
     expect(rows()).toEqual(['Go | 0', 'Python | 12']);
     expect(view().querySelector('tbody a')?.getAttribute('href')).toBe('/employees?skill=Python');
   });
 
   it('adds a skill and lists it', async () => {
+    // When
     await enter(view().querySelector('#new-skill-name')!, ' Rust ');
 
+    // Then
     const create = http.expectOne({ method: 'POST', url: '/api/v1/skills' });
     expect(create.request.body).toEqual({ name: 'Rust' });
+
+    // When
     create.flush({ id: 3, name: 'Rust' });
     await settle();
 
+    // Then
     expect(view().textContent).toContain('Added Rust.');
     (await list()).flush(page([GO, PYTHON, { id: 3, name: 'Rust', employee_count: 0 }]));
     await settle();
@@ -116,51 +122,64 @@ describe('SkillCatalogue', () => {
   });
 
   it('explains why a skill was not added', async () => {
+    // Given
     await enter(view().querySelector('#new-skill-name')!, 'python');
 
+    // When
     http
       .expectOne({ method: 'POST', url: '/api/v1/skills' })
       .flush(...conflict('The catalogue already has Python (skill 2)'));
     await settle();
 
+    // Then
     expect(view().textContent).toContain('The skill was not added.');
     expect(view().textContent).toContain('The catalogue already has Python (skill 2)');
   });
 
   it('renames a skill in place', async () => {
+    // When
     button('Rename Go').click();
     await settle();
     await enter(view().querySelector('input[aria-label="New name for Go"]')!, 'Golang');
 
+    // Then
     const rename = http.expectOne({ method: 'PATCH', url: '/api/v1/skills/1' });
     expect(rename.request.body).toEqual({ name: 'Golang' });
+
+    // When
     rename.flush({ id: 1, name: 'Golang' });
     await settle();
 
+    // Then
     (await list()).flush(page([{ ...GO, name: 'Golang' }, PYTHON]));
     await settle();
     expect(rows()).toEqual(['Golang | 0', 'Python | 12']);
   });
 
   it('keeps the new name when renaming fails', async () => {
+    // Given
     button('Rename Go').click();
     await settle();
     const input = view().querySelector<HTMLInputElement>('input[aria-label="New name for Go"]')!;
     await enter(input, 'python');
 
+    // When
     http
       .expectOne({ method: 'PATCH', url: '/api/v1/skills/1' })
       .flush(...conflict('The catalogue already has Python (skill 2)'));
     await settle();
 
+    // Then
     expect(alert()).toBe('The catalogue already has Python (skill 2)');
     expect(input.value).toBe('python');
   });
 
   it('removes a skill nobody has after confirming', async () => {
+    // When
     button('Remove Go').click();
     await settle();
 
+    // Then
     expect(dialogs).toEqual([expect.objectContaining({ type: 'delete-confirm' })]);
     http.expectOne({ method: 'DELETE', url: '/api/v1/skills/1' }).flush(null);
     await settle();
@@ -170,29 +189,41 @@ describe('SkillCatalogue', () => {
   });
 
   it('removes nothing when the removal is cancelled', async () => {
+    // Given
     answer = 'cancel';
+
+    // When
     button('Remove Go').click();
     await settle();
 
+    // Then
     http.expectNone({ method: 'DELETE' });
   });
 
   it('cannot remove a skill that employees have', () => {
+    // Then
     expect(button('Remove Python').disabled).toBe(true);
   });
 
   it('imports a CSV file of skills and reports what happened', async () => {
+    // Given
     const file = new File(['name\nRust\n'], 'skills.csv');
+
+    // When
     fixture.debugElement
       .query(By.directive(SiFileDropzoneComponent))
       .componentInstance.filesAdded.emit([
         { file, fileName: 'skills.csv', status: 'added', size: '1 KB', progress: 0 },
       ]);
     await settle();
+
+    // Then
     expect(view().textContent).toContain('Importing skills.csv…');
 
     const upload = http.expectOne({ method: 'POST', url: '/api/v1/skills/import' });
     expect((upload.request.body as FormData).get('file')).toEqual(file);
+
+    // When
     upload.flush({
       rows_created: 1,
       rows_existing: 2,
@@ -200,16 +231,19 @@ describe('SkillCatalogue', () => {
     });
     await settle();
 
+    // Then
     expect(view().textContent).toContain('1 added, 2 already in the catalogue, 1 row skipped.');
     expect(view().textContent).toContain('Row 5: String should have at most 100 characters');
     (await list()).flush(page([GO, PYTHON]));
   });
 
   it('says when no skill matches the search', async () => {
+    // When
     fixture.componentRef.setInput('q', 'cobol');
     (await list()).flush(page([]));
     await settle();
 
+    // Then
     expect(view().textContent).toContain('No skills match your search');
   });
 });

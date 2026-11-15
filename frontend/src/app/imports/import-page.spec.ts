@@ -64,28 +64,37 @@ describe('ImportPage', () => {
   }
 
   it('lists past imports with their status', async () => {
+    // When
     (await historyRequest()).flush(history([summary]));
     await fixture.whenStable();
 
+    // Then
     const cells = [...view().querySelectorAll('tbody td')].map((td) => td.textContent?.trim());
     expect(cells.slice(1)).toEqual(['employees-with-errors.csv', 'Partially succeeded', '2', '7']);
     expect(view().querySelector('tbody a')?.getAttribute('href')).toBe('/imports/3');
   });
 
   it('uploads a dropped file, shows the report and refreshes the history', async () => {
+    // Given
     (await historyRequest()).flush(history([]));
     await fixture.whenStable();
     expect(view().textContent).toContain('No imports yet.');
 
+    // When
     const file = drop();
     await settle();
+
+    // Then
     expect(view().textContent).toContain('Importing employees.csv…');
 
     const upload = http.expectOne({ method: 'POST', url: '/api/v1/imports' });
     expect((upload.request.body as FormData).get('file')).toEqual(file);
+
+    // When
     upload.flush(partialImport);
     await settle();
 
+    // Then
     expect(view().querySelector('app-import-report')?.textContent).toContain(
       '2 of 9 rows imported.',
     );
@@ -95,9 +104,11 @@ describe('ImportPage', () => {
   });
 
   it('shows why the server rejected the upload', async () => {
+    // Given
     (await historyRequest()).flush(history([]));
     await fixture.whenStable();
 
+    // When
     drop('huge.csv');
     await settle();
     http
@@ -108,14 +119,17 @@ describe('ImportPage', () => {
       );
     await settle();
 
+    // Then
     expect(view().textContent).toContain('The file is larger than 10 MB');
     expect(view().querySelector('si-file-dropzone')).not.toBeNull();
   });
 
   it('reports files the dropzone refused without uploading them', async () => {
+    // Given
     (await historyRequest()).flush(history([]));
     await fixture.whenStable();
 
+    // When
     dropzone().filesAdded.emit([
       {
         file: new File(['x'], 'photo.png'),
@@ -135,29 +149,35 @@ describe('ImportPage', () => {
     });
     await settle();
 
+    // Then
     expect(view().textContent).toContain('Incorrect file type selected');
     http.expectNone({ method: 'POST', url: '/api/v1/imports' });
   });
 
   it('pages through a long history', async () => {
+    // Given
     (await historyRequest()).flush(history([summary], 25));
     await fixture.whenStable();
 
+    // When
     const paginator: SiPaginationComponent = fixture.debugElement.query(
       By.directive(SiPaginationComponent),
     ).componentInstance;
     paginator.currentPage.set(2);
     await settle();
 
+    // Then
     const request = await historyRequest();
     expect(request.request.params.get('page')).toBe('2');
     request.flush(history([summary], 25, 2));
   });
 
   it('shows when the history cannot be loaded', async () => {
+    // When
     (await historyRequest()).flush(null, { status: 0, statusText: 'Unknown Error' });
     await fixture.whenStable();
 
+    // Then
     expect(view().textContent).toContain('The server cannot be reached.');
   });
 });

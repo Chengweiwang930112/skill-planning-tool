@@ -85,33 +85,45 @@ describe('SkillPicker', () => {
   }
 
   it('suggests catalogue skills that are not excluded', async () => {
+    // Given
     fixture.componentRef.setInput('exclude', ['go']);
 
+    // When / Then
     expect(await search('go')).toEqual([{ id: 2, name: 'Google Cloud' }]);
   });
 
   it('has a skill once one is chosen from the suggestions', async () => {
+    // Given
     await type('goo');
+
+    // When
     internals().choose({
       option: { text: 'Google Cloud', option: { id: 2, name: 'Google Cloud' } },
     });
 
+    // Then
     expect(picker().skill).toEqual({ id: 2, name: 'Google Cloud' });
     expect(validate()).toBe(true);
     expect(changes).toEqual([{ id: 2, name: 'Google Cloud' }]);
   });
 
   it('forgets the chosen skill when the text is changed', async () => {
+    // Given
     internals().choose({ option: { text: 'Go', option: { id: 1, name: 'Go' } } });
+
+    // When
     await type('Gol');
 
+    // Then
     expect(picker().skill).toBeUndefined();
     expect(changes).toEqual([{ id: 1, name: 'Go' }, undefined]);
   });
 
   it('takes a typed name that is exactly a suggestion', async () => {
+    // When
     await type('python');
 
+    // Then
     expect(validate()).toBe(true);
     expect(picker().skill).toEqual({ id: 3, name: 'Python' });
     await fixture.whenStable();
@@ -119,38 +131,51 @@ describe('SkillPicker', () => {
   });
 
   it('asks to choose when the typed text only partly matches', async () => {
+    // When
     await type('goo');
 
+    // Then
     expect(validate()).toBe(false);
     expect(hint()).toBe('Choose a skill from the suggestions.');
   });
 
   it('says when nothing in the catalogue matches and links to it', async () => {
+    // When
     await type('Cobol');
 
+    // Then
     expect(validate()).toBe(false);
     expect(hint()).toBe('“Cobol” is not in the skill catalogue.');
     expect(picker().notFound()).toBe(true);
   });
 
   it('says when every match is listed already', async () => {
+    // Given
     fixture.componentRef.setInput('exclude', ['Python']);
+
+    // When
     await type('pyth');
 
+    // Then
     expect(validate()).toBe(false);
     expect(hint()).toBe('Every skill matching “pyth” is listed already.');
   });
 
   it('has nothing to explain while the input is empty', () => {
+    // When / Then
     expect(validate()).toBe(false);
     expect(hint()).toBe('');
   });
 
   it('clears the text and the chosen skill', async () => {
+    // Given
     internals().choose({ option: { text: 'Go', option: { id: 1, name: 'Go' } } });
+
+    // When
     picker().clear();
     await fixture.whenStable();
 
+    // Then
     expect(picker().skill).toBeUndefined();
     expect(picker().query).toBe('');
     expect(view().querySelector('input')!.value).toBe('');

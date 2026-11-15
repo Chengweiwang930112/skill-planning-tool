@@ -14,8 +14,10 @@ async function render(record: ImportRecord): Promise<HTMLElement> {
 
 describe('ImportReport', () => {
   it('summarises the counts and lists the row errors', async () => {
+    // When
     const view = await render(partialImport);
 
+    // Then
     expect(view.querySelector('si-inline-notification')?.textContent).toContain(
       '2 of 9 rows imported.',
     );
@@ -41,6 +43,7 @@ describe('ImportReport', () => {
   });
 
   it('explains why a whole file was rejected and offers no link to employees', async () => {
+    // When
     const view = await render({
       ...partialImport,
       status: 'failed',
@@ -52,20 +55,24 @@ describe('ImportReport', () => {
       row_errors: [],
     });
 
+    // Then
     expect(view.textContent).toContain('Missing required columns: email');
     expect(view.querySelector('table')).toBeNull();
     expect(view.querySelector('a[href="/employees"]')).toBeNull();
   });
 
   it('shows only the first errors of a file with very many', async () => {
+    // Given
     const row_errors = Array.from({ length: SHOWN_ROW_ERRORS + 50 }, (_, i) => ({
       row: i + 2,
       field: 'email',
       message: 'value is not a valid email address',
     }));
 
+    // When
     const view = await render({ ...partialImport, row_errors });
 
+    // Then
     expect(view.querySelectorAll('tbody tr')).toHaveLength(SHOWN_ROW_ERRORS);
     expect(view.textContent).toContain('Showing the first 200 of 250 errors.');
   });
