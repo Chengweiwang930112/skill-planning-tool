@@ -68,16 +68,26 @@ jobs:
           npx tsc --noEmit -p tsconfig.app.json
           npx tsc --noEmit -p tsconfig.spec.json
 
-  # Unit and component tests replace HTTP and the database by mocks, so they need no
-  # database; their coverage is what the quality gate measures and SonarQube sees.
+  # The backend's three test layers, shown together as one group. Unit and component
+  # tests replace HTTP and the database by mocks and record their coverage, which is
+  # what the quality gate measures and SonarQube sees. Integration tests go through
+  # HTTP into a real PostgreSQL; they run so much code at once that their coverage
+  # would make it look better than the tests are, so it is not measured.
   backend-test:
     name: Test · backend ${{ matrix.layer }}
     needs: [backend-lint, frontend-lint]
     strategy:
+      fail-fast: false
       matrix:
-        layer: [unit, component]
+        include:
+          - layer: unit
+            coverage: --cov-fail-under=0
+          - layer: component
+            coverage: --cov-fail-under=0
+          - layer: integration
+            coverage: --no-cov
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: backend
@@ -85,35 +95,8 @@ jobs:
       COVERAGE_FILE: .coverage.${{ matrix.layer }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-        with:
-          version: "0.12.3"
-          python-version: "3.12"
-          enable-cache: true
-          cache-dependency-glob: backend/uv.lock
-      - run: uv sync --locked
-      # The 80% threshold applies to both layers together, in the quality gate.
-      - run: uv run pytest tests/${{ matrix.layer }} --cov-fail-under=0
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: backend-coverage-${{ matrix.layer }}
-          path: backend/.coverage.${{ matrix.layer }}
-          include-hidden-files: true
-          if-no-files-found: error
-
-  # Through HTTP into a real PostgreSQL. A test that runs this much code would make the
-  # coverage figure look better than the tests are, so it is not measured.
-  backend-integration:
-    name: Test · backend integration
-    needs: [backend-lint, frontend-lint]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    defaults:
-      run:
-        working-directory: backend
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Start PostgreSQL
+        if: matrix.layer == 'integration'
         working-directory: .
         run: docker compose up --detach --wait db
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
@@ -124,10 +107,19 @@ jobs:
           cache-dependency-glob: backend/uv.lock
       - run: uv sync --locked
       - name: Migrations match the models
+        if: matrix.layer == 'integration'
         run: |
           uv run alembic upgrade head
           uv run alembic check
-      - run: uv run pytest tests/integration --no-cov
+      # The 80% threshold applies to unit and component tests together, in the quality gate.
+      - run: uv run pytest tests/${{ matrix.layer }} ${{ matrix.coverage }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: matrix.layer != 'integration'
+        with:
+          name: backend-coverage-${{ matrix.layer }}
+          path: backend/.coverage.${{ matrix.layer }}
+          include-hidden-files: true
+          if-no-files-found: error
 
   frontend-test:
     name: Test · frontend
@@ -174,7 +166,7 @@ jobs:
   # report covers its unit and component tests only.
   quality-gate:
     name: Quality gate · SonarQube
-    needs: [backend-test, backend-integration, frontend-test]
+    needs: [backend-test, frontend-test]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
