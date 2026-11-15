@@ -4,14 +4,11 @@ export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'employees' },
   {
     path: 'employees',
-    title: 'Employees · Staff & Skill Planning',
-    loadComponent: () => import('./employees/employee-list').then((m) => m.EmployeeList),
-  },
-  {
-    path: 'search',
-    title: 'Skill search · Staff & Skill Planning',
+    title: 'Find people · Staff & Skill Planning',
     loadComponent: () => import('./search/skill-search').then((m) => m.SkillSearch),
   },
+  // The skill search used to be a page of its own; old links keep their criteria.
+  { path: 'search', redirectTo: 'employees' },
   {
     path: 'skills',
     title: 'Skills · Staff & Skill Planning',

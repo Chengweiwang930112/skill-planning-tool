@@ -77,14 +77,21 @@ describe('SkillSearch', () => {
     return { items, total: items.length, page: 1, page_size: 20 };
   }
 
-  it('asks for a skill instead of listing everybody', async () => {
+  it('lists everybody before a skill is added', async () => {
     // When
     await harness.navigateByUrl('/search');
+    const request = await employeesRequest();
+
+    // Then
+    expect(request.request.params.has('skill')).toBe(false);
+
+    // When
+    request.flush(results([anna]));
     await settle();
 
     // Then
-    expect(view().textContent).toContain('Who has the skills you need?');
-    http.expectNone((r) => r.url === '/api/v1/employees');
+    expect(view().querySelector('h1')?.textContent).toBe('Find people by skill');
+    expect(view().textContent).toContain('Schmidt, Anna');
   });
 
   it('searches with the criteria in the URL and highlights the matched skills', async () => {
@@ -100,7 +107,7 @@ describe('SkillSearch', () => {
     await settle();
 
     // Then
-    expect(view().querySelector('h2')?.textContent).toBe('Results');
+    expect(view().querySelector('h2')?.textContent).toBe('Employees');
     const badges = [...view().querySelectorAll('tbody si-badge')].map((badge) => [
       badge.textContent?.trim(),
       badge.classList.contains('faded'),

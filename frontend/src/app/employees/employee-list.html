@@ -1,11 +1,7 @@
 <si-side-panel mode="over" [collapsed]="!employee()" (closed)="closePanel()">
   <div>
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-4 mb-6">
-      @if (embedded()) {
-        <h2 class="si-h4 mb-0">Results</h2>
-      } @else {
-        <h1 class="si-h3 mb-0">Employees</h1>
-      }
+      <h2 class="si-h4 mb-0">Employees</h2>
       <si-search-bar
         class="search"
         placeholder="Search by name, email or employee number"
@@ -75,6 +71,7 @@
                 <tr
                   class="clickable"
                   [class.table-active]="employee.id === this.employee()"
+                  [class.expanded-row]="expanded().has(employee.id)"
                   (click)="openFromRow(employee.id, $event)"
                 >
                   <td>
@@ -92,14 +89,47 @@
                   <td>{{ employee.job_title }}</td>
                   <td>{{ employee.location }}</td>
                   <td>
-                    <div class="d-flex flex-wrap gap-2">
-                      @for (assignment of employee.skills; track assignment.skill.id) {
-                        <si-badge
-                          [type]="levelBadge[assignment.level]"
-                          [class.faded]="faded(assignment)"
+                    <div class="skills" [class.expanded]="expanded().has(employee.id)">
+                      <div
+                        class="skill-badges"
+                        appOverflow
+                        (overflowChange)="setOverflowing(employee.id, $event)"
+                      >
+                        @for (assignment of skillsOf(employee); track assignment.skill.id) {
+                          <si-badge
+                            [attr.data-level]="assignment.level"
+                            [class.faded]="faded(assignment)"
+                          >
+                            {{ assignment.skill.name }} · {{ assignment.level }}
+                          </si-badge>
+                        }
+                      </div>
+                      @if (expanded().has(employee.id)) {
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-tertiary more"
+                          aria-expanded="true"
+                          (click)="toggleSkills(employee.id)"
                         >
-                          {{ assignment.skill.name }} · {{ assignment.level }}
-                        </si-badge>
+                          Show less
+                        </button>
+                      } @else if (overflowing().has(employee.id)) {
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-tertiary more"
+                          aria-expanded="false"
+                          [attr.aria-label]="
+                            'Show all ' +
+                            employee.skills.length +
+                            ' skills of ' +
+                            employee.first_name +
+                            ' ' +
+                            employee.last_name
+                          "
+                          (click)="toggleSkills(employee.id)"
+                        >
+                          …
+                        </button>
                       }
                     </div>
                   </td>

@@ -1,12 +1,5 @@
 import { httpResource } from '@angular/common/http';
-import {
-  booleanAttribute,
-  Component,
-  computed,
-  inject,
-  input,
-  numberAttribute,
-} from '@angular/core';
+import { Component, computed, inject, input, numberAttribute, signal } from '@angular/core';
 import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import { SiBadgeComponent } from '@siemens/element-ng/badge';
 import { SiEmptyStateComponent } from '@siemens/element-ng/empty-state';
@@ -18,7 +11,7 @@ import { SiSidePanelComponent, SiSidePanelContentComponent } from '@siemens/elem
 import type { Employee, EmployeePage, EmployeeSort, SkillAssignment } from '../api/models';
 import { problemMessage } from '../api/problem';
 import { matchesAny, parseCriterion } from '../shared/criteria';
-import { LEVEL_BADGE } from '../shared/level';
+import { Overflow } from '../shared/overflow';
 import { EmployeePanel } from './employee-panel';
 
 export const PAGE_SIZE = 20;
@@ -31,6 +24,7 @@ type SortField = 'last_name' | 'employee_number' | 'department' | 'location';
   selector: 'app-employee-list',
   imports: [
     EmployeePanel,
+    Overflow,
     RouterLink,
     SiBadgeComponent,
     SiEmptyStateComponent,
@@ -57,8 +51,6 @@ export class EmployeeList {
     transform: (value: unknown): string[] =>
       value == null ? [] : Array.isArray(value) ? value : [String(value)],
   });
-  /** Shown inside another page, which owns the page heading. */
-  readonly embedded = input(false, { transform: booleanAttribute });
 
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -72,7 +64,6 @@ export class EmployeeList {
     { label: 'Location', sort: 'location' },
     { label: 'Skills' },
   ];
-  protected readonly levelBadge = LEVEL_BADGE;
   protected readonly employees = httpResource<EmployeePage>(() => {
     const q = this.q();
     const skill = this.skill();
@@ -94,6 +85,10 @@ export class EmployeeList {
     return error ? problemMessage(error) : undefined;
   });
 
+  /** Employees whose skills do not fit on one line, and those shown in full. */
+  protected readonly overflowing = signal<ReadonlySet<number>>(new Set());
+  protected readonly expanded = signal<ReadonlySet<number>>(new Set());
+
   private readonly activeSort = computed(() => this.sort() ?? DEFAULT_SORT);
 
   protected sortDirection(field: SortField): 'ascending' | 'descending' | 'none' {
@@ -109,7 +104,7 @@ export class EmployeeList {
   /** The name link opens the panel for keyboard users; the row is the larger mouse target. */
   protected openFromRow(id: number, event: MouseEvent): void {
     const target = event.target as Element;
-    if (target.closest('a') || window.getSelection()?.toString()) {
+    if (target.closest('a, button') || window.getSelection()?.toString()) {
       return;
     }
     this.navigate({ employee: id });
@@ -124,6 +119,20 @@ export class EmployeeList {
   protected faded(assignment: SkillAssignment): boolean {
     const criteria = this.criteria();
     return criteria.length > 0 && !matchesAny(assignment, criteria);
+  }
+
+  /** Matching skills first, so that they are on the line shown before the rest is. */
+  protected skillsOf(employee: Employee): SkillAssignment[] {
+    const skills = employee.skills;
+    return [...skills.filter((s) => !this.faded(s)), ...skills.filter((s) => this.faded(s))];
+  }
+
+  protected setOverflowing(id: number, overflowing: boolean): void {
+    this.overflowing.update((ids) => toggled(ids, id, overflowing));
+  }
+
+  protected toggleSkills(id: number): void {
+    this.expanded.update((ids) => toggled(ids, id, !ids.has(id)));
   }
 
   protected closePanel(): void {
@@ -161,4 +170,14 @@ export class EmployeeList {
       queryParamsHandling: 'merge',
     });
   }
+}
+
+function toggled(ids: ReadonlySet<number>, id: number, on: boolean): ReadonlySet<number> {
+  const next = new Set(ids);
+  if (on) {
+    next.add(id);
+  } else {
+    next.delete(id);
+  }
+  return next;
 }

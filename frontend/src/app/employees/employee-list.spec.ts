@@ -57,7 +57,20 @@ describe('EmployeeList', () => {
   afterEach(() => {
     flushSuggestions();
     http.verify();
+    vi.restoreAllMocks();
   });
+
+  /** happy-dom lays nothing out: makes each line of skills taller than its box, or not. */
+  function skillsOverflow(overflowing: boolean): void {
+    const height = (skills: number) =>
+      function (this: HTMLElement): number {
+        return this.classList.contains('skill-badges') ? skills : 0;
+      };
+    vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(
+      height(overflowing ? 48 : 24),
+    );
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(height(24));
+  }
 
   /** Answers the requests the panel's typeahead makes on its own. */
   function flushSuggestions(): void {
@@ -362,6 +375,57 @@ describe('EmployeeList', () => {
   function searchBar(): SiSearchBarComponent {
     return harness.fixture.debugElement.query(By.directive(SiSearchBarComponent)).componentInstance;
   }
+
+  it('shows skills that do not fit on one line in full on request, in a taller row', async () => {
+    // Given
+    skillsOverflow(true);
+    const view = await respond(await open('/employees'), page([anna]));
+    const more = view.querySelector<HTMLButtonElement>('.skills .more')!;
+
+    // Then
+    expect(more.textContent?.trim()).toBe('…');
+    expect(more.getAttribute('aria-label')).toBe('Show all 2 skills of Anna Schmidt');
+    expect(view.querySelector('.skills')?.classList.contains('expanded')).toBe(false);
+
+    // When
+    more.click();
+    await harness.fixture.whenStable();
+
+    // Then
+    const row = view.querySelector('tbody tr')!;
+    expect(row.classList.contains('expanded-row')).toBe(true);
+    expect(row.querySelector('.skills')?.classList.contains('expanded')).toBe(true);
+    expect(row.querySelector('.more')?.textContent?.trim()).toBe('Show less');
+    expect(currentUrl()).toBe('/employees');
+
+    // When
+    row.querySelector<HTMLButtonElement>('.more')!.click();
+    await harness.fixture.whenStable();
+
+    // Then
+    expect(row.classList.contains('expanded-row')).toBe(false);
+    expect(row.querySelector('.more')?.textContent?.trim()).toBe('…');
+  });
+
+  it('offers nothing more when the skills fit on one line', async () => {
+    // Given
+    skillsOverflow(false);
+
+    // When
+    const view = await respond(await open('/employees'), page([anna]));
+
+    // Then
+    expect(view.querySelector('.skills .more')).toBeNull();
+  });
+
+  it('puts the skills that match the search first', async () => {
+    // When
+    const view = await respond(await open('/employees?skill=python'), page([anna]));
+
+    // Then
+    const badges = [...view.querySelectorAll('tbody si-badge')].map((b) => b.textContent?.trim());
+    expect(badges).toEqual(['Python · beginner', 'Kubernetes · expert']);
+  });
 
   function paginator(): SiPaginationComponent {
     return harness.fixture.debugElement.query(By.directive(SiPaginationComponent))

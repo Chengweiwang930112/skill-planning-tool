@@ -1,43 +1,38 @@
-import { Component, computed, inject, input, signal, viewChild } from '@angular/core';
+import { Component, computed, inject, input, viewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { SiEmptyStateComponent } from '@siemens/element-ng/empty-state';
 import type { EmployeeSort } from '../api/models';
 import { EmployeeList } from '../employees/employee-list';
 import { Criterion, formatCriterion, parseCriterion } from '../shared/criteria';
 import { SkillCriteria } from './skill-criteria';
 
-/** The criteria live in the URL in the API's format, so a search can be shared as a link. */
+/** The home page: skill criteria on top, the employees who match below. The criteria live
+ * in the URL in the API's format, so a search can be shared as a link. */
 @Component({
   selector: 'app-skill-search',
-  imports: [EmployeeList, SiEmptyStateComponent, SkillCriteria],
+  imports: [EmployeeList, SkillCriteria],
   template: `
-    <h1 class="si-h3 mb-2">Skill search</h1>
-    <p class="text-secondary mb-6">
-      Find employees by skill and minimum level. Employees must have every skill listed; a minimum
-      level also finds employees above it.
-    </p>
-
-    <section class="mb-8">
-      <app-skill-criteria [criteria]="criteria()" (criteriaChange)="search($event)" />
+    <section class="finder surface-dark">
+      <div class="container-fluid">
+        <h1 class="finder-title">Find people by skill</h1>
+        <p class="finder-lead">
+          List the skills you need with the lowest level that will do. People at a higher level
+          match too.
+        </p>
+        <app-skill-criteria [criteria]="criteria()" (criteriaChange)="search($event)" />
+      </div>
     </section>
 
-    @if (showResults()) {
+    <div class="container-fluid py-6">
       <app-employee-list
-        embedded
         [skill]="skill()"
         [q]="q()"
         [sort]="sort()"
         [page]="page()"
         [employee]="employee()"
       />
-    } @else {
-      <si-empty-state
-        icon="element-search"
-        heading="Who has the skills you need?"
-        content="Add a skill above, for example Kubernetes at advanced or higher, and press Search."
-      />
-    }
+    </div>
   `,
+  styleUrl: './skill-search.scss',
 })
 export class SkillSearch {
   readonly skill = input([], {
@@ -54,9 +49,6 @@ export class SkillSearch {
   private readonly results = viewChild(EmployeeList);
 
   protected readonly criteria = computed(() => this.skill().map(parseCriterion));
-  /** Set by a search without criteria, which lists everybody. */
-  private readonly searchedAll = signal(false);
-  protected readonly showResults = computed(() => this.criteria().length > 0 || this.searchedAll());
 
   /** Every search sends a request, also when it repeats the current one. */
   protected search(criteria: Criterion[]): void {
@@ -64,7 +56,6 @@ export class SkillSearch {
     const urlUnchanged =
       skill.join('\n') === this.skill().join('\n') && (this.page() ?? '1') === '1';
     const results = this.results();
-    this.searchedAll.set(skill.length === 0);
     if (!urlUnchanged) {
       void this.router.navigate([], {
         relativeTo: this.route,

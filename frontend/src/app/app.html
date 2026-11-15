@@ -1,15 +1,21 @@
-<si-application-header>
+<si-application-header class="surface-dark">
   <si-header-brand>
-    <span class="application-name">{{ title }}</span>
+    <a class="application-name" routerLink="/employees">{{ title }}</a>
   </si-header-brand>
-  <si-header-navigation>
-    <a si-header-navigation-item routerLink="/employees" routerLinkActive="active">Employees</a>
-    <a si-header-navigation-item routerLink="/search" routerLinkActive="active">Skill search</a>
-    <a si-header-navigation-item routerLink="/skills" routerLinkActive="active">Skills</a>
-    <a si-header-navigation-item routerLink="/imports" routerLinkActive="active">Import</a>
-  </si-header-navigation>
+  <si-header-actions>
+    <button type="button" si-header-selection-item [siHeaderDropdownTriggerFor]="manage">
+      Manage
+    </button>
+  </si-header-actions>
 </si-application-header>
 
-<main class="container-fluid py-6">
+<ng-template #manage>
+  <si-header-dropdown>
+    <a si-header-dropdown-item icon="element-list" routerLink="/skills">Skill catalogue</a>
+    <a si-header-dropdown-item icon="element-upload" routerLink="/imports">Import employees</a>
+  </si-header-dropdown>
+</ng-template>
+
+<main>
   <router-outlet />
 </main>

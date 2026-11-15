@@ -58,6 +58,23 @@ HTTP (status codes, problem details), the services in `app/services`
 frontend's types are generated from it. The reasoning behind the main choices
 is in the [architecture decision records](docs/adr/README.md).
 
+## User interface
+
+The home page is what the tool is for: finding the people who have the skills a
+project needs. Skill criteria sit in a deep blue band at the top, the employees
+who match below, all of them while no skill is listed. Looking after the data —
+the skill catalogue and importing employees — is under **Manage** in the header,
+and those pages lead back with a breadcrumb.
+
+The look is Siemens Element's public theme recoloured with Siemens' public brand
+colours, since Element's Siemens brand theme (`@simpl/brand`) is internal:
+deep blue `#000028` for the header and the search, petrol `#009999` as the accent
+(darkened to `#007373` where text has to stay readable on white), greys tinted
+with deep blue, and Arial, Siemens' substitute for Siemens Sans.
+`frontend/src/styles.scss` derives the theme by replacing the accent colours in
+Element's own, so every Element component follows. Proficiency levels deepen
+from light petrol to deep blue, as levels are an order rather than a status.
+
 ## Prerequisites
 
 - [uv](https://docs.astral.sh/uv/) (Python toolchain and dependency manager)

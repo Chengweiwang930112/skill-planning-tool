@@ -29,3 +29,34 @@
   filter: grayscale(1);
   opacity: 0.55;
 }
+
+// At most one line of skills until they are shown in full, so that a long list does
+// not squeeze the other columns: the row grows instead.
+.skills {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.25rem;
+  max-inline-size: 28rem;
+}
+
+.skill-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  min-inline-size: 0;
+  max-block-size: 1.5rem;
+  overflow: hidden;
+
+  .expanded & {
+    max-block-size: none;
+  }
+}
+
+.more {
+  flex-shrink: 0;
+}
+
+// A grown row reads from the top, next to the first line of skills, rather than centred.
+.expanded-row > td {
+  vertical-align: top;
+}

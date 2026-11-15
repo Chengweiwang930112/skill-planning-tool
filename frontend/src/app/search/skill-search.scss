@@ -1,0 +1,18 @@
+// The one deep blue band of the app, continuing the header: what this tool is for.
+.finder {
+  padding-block: 2rem 2.5rem;
+}
+
+.finder-title {
+  margin: 0 0 0.5rem;
+  font-size: 2.25rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+.finder-lead {
+  max-inline-size: 60ch;
+  margin: 0 0 1.75rem;
+  color: var(--element-text-secondary);
+}

@@ -1,22 +1,29 @@
 import { Component } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { RouterLink, RouterOutlet } from '@angular/router';
 import {
   SiApplicationHeaderComponent,
+  SiHeaderActionsDirective,
   SiHeaderBrandDirective,
-  SiHeaderNavigationComponent,
-  SiHeaderNavigationItemComponent,
+  SiHeaderSelectionItemComponent,
 } from '@siemens/element-ng/application-header';
+import {
+  SiHeaderDropdownComponent,
+  SiHeaderDropdownItemComponent,
+  SiHeaderDropdownTriggerDirective,
+} from '@siemens/element-ng/header-dropdown';
 
 @Component({
   selector: 'app-root',
   imports: [
     RouterLink,
-    RouterLinkActive,
     RouterOutlet,
     SiApplicationHeaderComponent,
+    SiHeaderActionsDirective,
     SiHeaderBrandDirective,
-    SiHeaderNavigationComponent,
-    SiHeaderNavigationItemComponent,
+    SiHeaderDropdownComponent,
+    SiHeaderDropdownItemComponent,
+    SiHeaderDropdownTriggerDirective,
+    SiHeaderSelectionItemComponent,
   ],
   templateUrl: './app.html',
 })

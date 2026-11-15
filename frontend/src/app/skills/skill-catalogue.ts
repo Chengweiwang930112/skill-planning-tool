@@ -4,6 +4,7 @@ import { Component, computed, inject, input, numberAttribute, signal } from '@an
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import { SiActionDialogService } from '@siemens/element-ng/action-modal';
+import { SiBreadcrumbComponent } from '@siemens/element-ng/breadcrumb';
 import { SiEmptyStateComponent } from '@siemens/element-ng/empty-state';
 import { SiFileDropzoneComponent } from '@siemens/element-ng/file-uploader';
 import { SiInlineNotificationComponent } from '@siemens/element-ng/inline-notification';
@@ -28,6 +29,7 @@ interface DroppedFile {
     DecimalPipe,
     FormsModule,
     RouterLink,
+    SiBreadcrumbComponent,
     SiEmptyStateComponent,
     SiFileDropzoneComponent,
     SiInlineNotificationComponent,
@@ -35,6 +37,7 @@ interface DroppedFile {
     SiPaginationComponent,
     SiSearchBarComponent,
   ],
+  host: { class: 'd-block container-fluid py-6' },
   templateUrl: './skill-catalogue.html',
   styleUrl: './skill-catalogue.scss',
 })

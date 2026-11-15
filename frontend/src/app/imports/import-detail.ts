@@ -1,6 +1,6 @@
 import { httpResource } from '@angular/common/http';
 import { Component, computed, input, numberAttribute } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { SiBreadcrumbComponent } from '@siemens/element-ng/breadcrumb';
 import { SiInlineNotificationComponent } from '@siemens/element-ng/inline-notification';
 import { SiLoadingSpinnerComponent } from '@siemens/element-ng/loading-spinner';
 import type { ImportRecord } from '../api/models';
@@ -9,9 +9,23 @@ import { ImportReport } from './import-report';
 
 @Component({
   selector: 'app-import-detail',
-  imports: [ImportReport, RouterLink, SiInlineNotificationComponent, SiLoadingSpinnerComponent],
+  imports: [
+    ImportReport,
+    SiBreadcrumbComponent,
+    SiInlineNotificationComponent,
+    SiLoadingSpinnerComponent,
+  ],
+  host: { class: 'd-block container-fluid py-6' },
   template: `
-    <a class="d-inline-block mb-4" routerLink="/imports">← All imports</a>
+    <si-breadcrumb
+      showRootAsText
+      class="d-block mb-4"
+      [items]="[
+        { title: 'Find people', link: '/employees' },
+        { title: 'Import employees', link: '/imports' },
+        { title: 'Import report' },
+      ]"
+    />
     @if (error(); as message) {
       <si-inline-notification
         severity="danger"

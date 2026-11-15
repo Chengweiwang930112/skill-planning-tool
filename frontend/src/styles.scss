@@ -1,15 +1,137 @@
 @charset "UTF-8";
+@use 'sass:color';
+@use 'sass:map';
+@use 'sass:math';
+@use 'sass:meta';
 
-// The public `element` theme. The Siemens brand theme (Siemens Sans, brand
-// colours) lives in the internal @simpl/brand package, which is not available
-// on the public registry.
+// Element's public theme, recoloured with Siemens' public brand colours: the brand
+// theme itself (@simpl/brand) is internal and not on the public registry. Only the
+// recoloured `siemens` theme is generated; Element's own stays out of the CSS.
 @use '@siemens/element-theme/src/theme' with (
-  $element-theme-default: 'element',
-  $element-themes: ('element')
+  $element-theme-default: 'siemens',
+  $element-themes: ('siemens')
 );
+@use '@siemens/element-theme/src/styles/themes';
+@use '@siemens/element-theme/src/theme/theme-element';
 
 // CDK overlay z-indexes and a11y helpers that Element's dialogs, dropdowns and
 // tooltips depend on.
 @use '@siemens/element-ng/element-ng';
 
 @use '@siemens/element-icons/dist/style/siemens-element-icons';
+
+$deep-blue: #000028;
+$petrol: #009999;
+$bold-green: #00ffb9;
+
+// Petrol is too light for text and buttons on white (3.5:1); these keep 4.5:1 or more.
+$petrol-dark: #007373;
+$petrol-darker: #005c5c;
+
+// Element's purple accents, by their hex value in each of its two themes.
+$light-accents: (
+  #7353e5: $petrol-dark,
+  #2e3a70: $petrol-darker,
+  #4c3fbf: $petrol-darker,
+  #553ba3: $petrol-darker,
+  #b5b3f4: color.mix($petrol, #fff, 50%),
+  #ece9ff: color.mix($petrol, #fff, 12%),
+  #d6d5ff: color.mix($petrol, #fff, 16%),
+  #9fabff: $petrol,
+  #f3f3f3: #f3f3f0,
+  #e8e8e8: #e6e6df,
+);
+$dark-accents: (
+  #6477ff: #00cccc,
+  #7c8cff: $bold-green,
+  #4c3fbf: color.mix($petrol, $deep-blue, 45%),
+  #1c144f: color.mix($petrol, $deep-blue, 25%),
+  #9fabff: $bold-green,
+);
+
+// Element's greys tinted with deep blue at the same lightness, as Siemens' greys are.
+@function _tint($value) {
+  @if meta.type-of($value) != 'color' or color.alpha($value) < 1 {
+    @return $value;
+  }
+  $red: color.channel($value, 'red', $space: rgb);
+  @if $red == color.channel($value, 'green', $space: rgb) and
+    $red == color.channel($value, 'blue', $space: rgb) and
+    $red < 255
+  {
+    @return color.mix($deep-blue, #fff, (1 - math.div($red, 255)) * 100%);
+  }
+  @return $value;
+}
+
+@function _recolour($theme, $accents) {
+  $result: ();
+  @each $token, $value in $theme {
+    $replacement: null;
+    @if meta.type-of($value) == 'color' {
+      $replacement: map.get($accents, $value);
+    }
+    $result: map.set($result, $token, $replacement or _tint($value));
+  }
+  @return $result;
+}
+
+@include themes.make-theme(
+  _recolour(theme-element.$theme-element-light, $light-accents),
+  'siemens'
+);
+
+// The deep blue areas (header, search) use the dark variant, so that the Element
+// components inside them adapt by themselves.
+@include themes.make-theme(
+  _recolour(theme-element.$theme-element-dark, $dark-accents),
+  'siemens',
+  $root-selector: '.surface-dark'
+);
+
+.surface-dark {
+  background-color: $deep-blue;
+  color: var(--element-text-primary);
+}
+
+// The header runs into the home page's search band as one deep blue area.
+si-application-header.surface-dark .application-header {
+  background-color: $deep-blue;
+  border-block-end-color: transparent;
+}
+
+a.application-name {
+  // Aligned with the page content below, which starts at the container's padding.
+  padding-inline-start: 0.5rem;
+  color: var(--element-text-primary);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+// Proficiency deepens from light petrol to deep blue: an order, not a status, so none
+// of Element's status colours. Element sets the default badge's background with
+// !important, so these have to as well.
+si-badge.badge[data-level] {
+  font-weight: 700;
+  outline: none;
+}
+
+si-badge.badge[data-level='beginner'] {
+  background: color.mix($petrol, #fff, 12%) !important;
+  color: $petrol-darker;
+}
+
+si-badge.badge[data-level='intermediate'] {
+  background: color.mix($petrol, #fff, 38%) !important;
+  color: $deep-blue;
+}
+
+si-badge.badge[data-level='advanced'] {
+  background: $petrol-dark !important;
+  color: #fff;
+}
+
+si-badge.badge[data-level='expert'] {
+  background: $deep-blue !important;
+  color: #fff;
+}

@@ -2,6 +2,7 @@ import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpClient, httpResource } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { SiBreadcrumbComponent } from '@siemens/element-ng/breadcrumb';
 import { SiBadgeComponent } from '@siemens/element-ng/badge';
 import { SiFileDropzoneComponent } from '@siemens/element-ng/file-uploader';
 import { SiInlineNotificationComponent } from '@siemens/element-ng/inline-notification';
@@ -28,12 +29,14 @@ interface DroppedFile {
     DecimalPipe,
     ImportReport,
     RouterLink,
+    SiBreadcrumbComponent,
     SiBadgeComponent,
     SiFileDropzoneComponent,
     SiInlineNotificationComponent,
     SiLoadingSpinnerComponent,
     SiPaginationComponent,
   ],
+  host: { class: 'd-block container-fluid py-6' },
   templateUrl: './import-page.html',
 })
 export class ImportPage {
