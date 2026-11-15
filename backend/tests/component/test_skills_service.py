@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.models import Skill
 from app.schemas import SkillQuery
-from app.services.skills import (
+from app.services.skills_service import (
     DuplicateSkillError,
     SkillInUseError,
     create_skill,

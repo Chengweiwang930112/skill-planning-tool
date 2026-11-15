@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_session
 from app.core.errors import problem_response
 from app.schemas import ImportRead, ImportSummary, Page, PageQuery
-from app.services import employee_import as service
+from app.services import import_service
 from app.services.csv_parsing import OPTIONAL_COLUMNS, REQUIRED_COLUMNS
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
@@ -41,13 +41,13 @@ def create_import(
     content = file.file.read(MAX_UPLOAD_BYTES + 1)
     if len(content) > MAX_UPLOAD_BYTES:
         raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "The file is larger than 10 MB")
-    record = service.import_employees(session, file.filename or "upload.csv", content)
+    record = import_service.import_employees(session, file.filename or "upload.csv", content)
     return ImportRead.model_validate(record)
 
 
 @router.get("", summary="List imports, newest first")
 def list_imports(session: SessionDep, query: Annotated[PageQuery, Query()]) -> Page[ImportSummary]:
-    imports, total = service.list_imports(session, query.page, query.page_size)
+    imports, total = import_service.list_imports(session, query.page, query.page_size)
     return Page(
         items=[ImportSummary.model_validate(record) for record in imports],
         total=total,
@@ -62,7 +62,7 @@ def list_imports(session: SessionDep, query: Annotated[PageQuery, Query()]) -> P
     responses={status.HTTP_404_NOT_FOUND: problem_response("Import not found")},
 )
 def get_import(session: SessionDep, import_id: int) -> ImportRead:
-    record = service.get_import(session, import_id)
+    record = import_service.get_import(session, import_id)
     if record is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"Import {import_id} does not exist")
     return ImportRead.model_validate(record)

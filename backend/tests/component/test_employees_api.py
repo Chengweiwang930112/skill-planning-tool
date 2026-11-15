@@ -7,8 +7,7 @@ from fastapi.testclient import TestClient
 
 from app.models import ProficiencyLevel, Skill
 from app.schemas import EmployeeQuery, SkillLevelWrite
-from app.services import employees
-from app.services import skills as catalogue
+from app.services import employees_service, skills_service
 from tests.component.conftest import MockService
 from tests.factories import make_employee
 
@@ -33,7 +32,9 @@ def test_lists_the_employees_the_service_found(
     # Given
     go = Skill(id=7, name="Go")
     list_employees = mock_service(
-        employees, "list_employees", return_value=([anna((go, ProficiencyLevel.EXPERT))], 41)
+        employees_service,
+        "list_employees",
+        return_value=([anna((go, ProficiencyLevel.EXPERT))], 41),
     )
 
     # When
@@ -67,7 +68,7 @@ def test_passes_search_filters_and_sorting_to_the_service(
     client: TestClient, session: MagicMock, mock_service: MockService
 ) -> None:
     # Given
-    list_employees = mock_service(employees, "list_employees", return_value=([], 0))
+    list_employees = mock_service(employees_service, "list_employees", return_value=([], 0))
 
     # When
     client.get(
@@ -108,7 +109,7 @@ def test_rejects_invalid_parameters_as_problem_details_without_searching(
     client: TestClient, mock_service: MockService, params: dict[str, Any], name: str, reason: str
 ) -> None:
     # Given
-    list_employees = mock_service(employees, "list_employees")
+    list_employees = mock_service(employees_service, "list_employees")
 
     # When
     response = client.get(URL, params=params)
@@ -128,7 +129,7 @@ def test_gets_one_employee(
     client: TestClient, session: MagicMock, mock_service: MockService
 ) -> None:
     # Given
-    get_employee = mock_service(employees, "get_employee", return_value=anna())
+    get_employee = mock_service(employees_service, "get_employee", return_value=anna())
 
     # When
     response = client.get(f"{URL}/1")
@@ -143,7 +144,7 @@ def test_an_unknown_employee_is_a_404_problem(
     client: TestClient, mock_service: MockService
 ) -> None:
     # Given
-    mock_service(employees, "get_employee", return_value=None)
+    mock_service(employees_service, "get_employee", return_value=None)
 
     # When
     response = client.get(f"{URL}/999999")
@@ -165,9 +166,11 @@ def test_replaces_the_skills_and_answers_with_the_stored_ones(
     # Given
     go = Skill(id=7, name="Go")
     mock_service(
-        employees, "get_employee", side_effect=[anna(), anna((go, ProficiencyLevel.ADVANCED))]
+        employees_service,
+        "get_employee",
+        side_effect=[anna(), anna((go, ProficiencyLevel.ADVANCED))],
     )
-    replace_skills = mock_service(employees, "replace_skills")
+    replace_skills = mock_service(employees_service, "replace_skills")
 
     # When
     response = client.put(
@@ -186,8 +189,8 @@ def test_replacing_skills_of_an_unknown_employee_is_a_404(
     client: TestClient, mock_service: MockService
 ) -> None:
     # Given
-    mock_service(employees, "get_employee", return_value=None)
-    replace_skills = mock_service(employees, "replace_skills")
+    mock_service(employees_service, "get_employee", return_value=None)
+    replace_skills = mock_service(employees_service, "replace_skills")
 
     # When
     response = client.put(f"{URL}/999999/skills", json={"skills": []})
@@ -202,8 +205,12 @@ def test_skills_missing_from_the_catalogue_are_a_422(
     client: TestClient, mock_service: MockService
 ) -> None:
     # Given
-    mock_service(employees, "get_employee", return_value=anna())
-    mock_service(employees, "replace_skills", side_effect=employees.UnknownSkillsError([999999]))
+    mock_service(employees_service, "get_employee", return_value=anna())
+    mock_service(
+        employees_service,
+        "replace_skills",
+        side_effect=employees_service.UnknownSkillsError([999999]),
+    )
 
     # When
     response = client.put(
@@ -231,8 +238,8 @@ def test_rejects_an_invalid_skill_list_without_changing_anything(
     client: TestClient, mock_service: MockService, skills: list[dict[str, object]], reason: str
 ) -> None:
     # Given
-    get_employee = mock_service(employees, "get_employee")
-    replace_skills = mock_service(employees, "replace_skills")
+    get_employee = mock_service(employees_service, "get_employee")
+    replace_skills = mock_service(employees_service, "replace_skills")
 
     # When
     response = client.put(f"{URL}/1/skills", json={"skills": skills})
@@ -249,9 +256,9 @@ def test_assigning_a_skill_tells_new_from_changed(
     client: TestClient, session: MagicMock, mock_service: MockService, created: bool, code: int
 ) -> None:
     # Given
-    mock_service(employees, "get_employee", return_value=anna())
-    mock_service(catalogue, "get_skill", return_value=Skill(id=7, name="Go"))
-    assign_skill = mock_service(employees, "assign_skill", return_value=created)
+    mock_service(employees_service, "get_employee", return_value=anna())
+    mock_service(skills_service, "get_skill", return_value=Skill(id=7, name="Go"))
+    assign_skill = mock_service(employees_service, "assign_skill", return_value=created)
 
     # When
     response = client.put(f"{URL}/1/skills/7", json={"level": "expert"})
@@ -264,9 +271,9 @@ def test_assigning_a_skill_tells_new_from_changed(
 
 def test_removes_a_skill(client: TestClient, session: MagicMock, mock_service: MockService) -> None:
     # Given
-    mock_service(employees, "get_employee", return_value=anna())
-    mock_service(catalogue, "get_skill", return_value=Skill(id=7, name="Go"))
-    remove_skill = mock_service(employees, "remove_skill")
+    mock_service(employees_service, "get_employee", return_value=anna())
+    mock_service(skills_service, "get_skill", return_value=Skill(id=7, name="Go"))
+    remove_skill = mock_service(employees_service, "remove_skill")
 
     # When
     response = client.delete(f"{URL}/1/skills/7")
@@ -291,12 +298,12 @@ def test_an_assignment_of_an_unknown_employee_or_skill_is_a_404(
     detail: str,
 ) -> None:
     # Given
-    mock_service(employees, "get_employee", return_value=anna() if employee_found else None)
+    mock_service(employees_service, "get_employee", return_value=anna() if employee_found else None)
     mock_service(
-        catalogue, "get_skill", return_value=Skill(id=7, name="Go") if skill_found else None
+        skills_service, "get_skill", return_value=Skill(id=7, name="Go") if skill_found else None
     )
-    assign_skill = mock_service(employees, "assign_skill")
-    remove_skill = mock_service(employees, "remove_skill")
+    assign_skill = mock_service(employees_service, "assign_skill")
+    remove_skill = mock_service(employees_service, "remove_skill")
     body = {"level": "advanced"} if method == "put" else None
 
     # When

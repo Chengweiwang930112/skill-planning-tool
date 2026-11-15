@@ -3,8 +3,8 @@ from unittest.mock import MagicMock
 from fastapi import status
 from fastapi.testclient import TestClient
 
-from app.api.imports import MAX_UPLOAD_BYTES
-from app.services import employee_import
+from app.api.imports_api import MAX_UPLOAD_BYTES
+from app.services import import_service
 from tests.component.conftest import MockService
 from tests.factories import make_import
 
@@ -15,7 +15,7 @@ def test_imports_an_uploaded_file_and_answers_with_its_record(
     client: TestClient, session: MagicMock, mock_service: MockService
 ) -> None:
     # Given
-    import_employees = mock_service(employee_import, "import_employees", return_value=make_import())
+    import_employees = mock_service(import_service, "import_employees", return_value=make_import())
 
     # When
     response = client.post(URL, files={"file": ("team.csv", b"employee_number\n", "text/csv")})
@@ -44,7 +44,7 @@ def test_rejects_files_larger_than_the_limit_without_importing(
     client: TestClient, mock_service: MockService
 ) -> None:
     # Given
-    import_employees = mock_service(employee_import, "import_employees")
+    import_employees = mock_service(import_service, "import_employees")
     content = b"x" * (MAX_UPLOAD_BYTES + 1)
 
     # When
@@ -58,7 +58,7 @@ def test_rejects_files_larger_than_the_limit_without_importing(
 
 def test_requires_a_file(client: TestClient, mock_service: MockService) -> None:
     # Given
-    import_employees = mock_service(employee_import, "import_employees")
+    import_employees = mock_service(import_service, "import_employees")
 
     # When
     response = client.post(URL)
@@ -74,7 +74,7 @@ def test_lists_imports_without_their_row_errors(
 ) -> None:
     # Given
     list_imports = mock_service(
-        employee_import, "list_imports", return_value=([make_import(id=9)], 12)
+        import_service, "list_imports", return_value=([make_import(id=9)], 12)
     )
 
     # When
@@ -90,7 +90,7 @@ def test_lists_imports_without_their_row_errors(
 
 def test_gets_one_import_with_its_row_errors(client: TestClient, mock_service: MockService) -> None:
     # Given
-    mock_service(employee_import, "get_import", return_value=make_import())
+    mock_service(import_service, "get_import", return_value=make_import())
 
     # When
     response = client.get(f"{URL}/3")
@@ -103,7 +103,7 @@ def test_gets_one_import_with_its_row_errors(client: TestClient, mock_service: M
 
 def test_an_unknown_import_is_a_404_problem(client: TestClient, mock_service: MockService) -> None:
     # Given
-    mock_service(employee_import, "get_import", return_value=None)
+    mock_service(import_service, "get_import", return_value=None)
 
     # When
     response = client.get(f"{URL}/999999")

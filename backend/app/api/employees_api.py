@@ -15,8 +15,7 @@ from app.schemas import (
     SkillAssignmentWrite,
     SkillRead,
 )
-from app.services import employees as service
-from app.services import skills as skills_service
+from app.services import employees_service, skills_service
 
 router = APIRouter(
     prefix="/employees",
@@ -32,7 +31,7 @@ def list_employees(
     session: SessionDep, query: Annotated[EmployeeQuery, Query()]
 ) -> Page[EmployeeRead]:
     """Employees with their assigned skills, filtered, sorted and paginated."""
-    employees, total = service.list_employees(session, query)
+    employees, total = employees_service.list_employees(session, query)
     return Page(
         items=[EmployeeRead.model_validate(employee) for employee in employees],
         total=total,
@@ -47,7 +46,7 @@ def list_employees(
     responses={status.HTTP_404_NOT_FOUND: problem_response("Employee not found")},
 )
 def get_employee(session: SessionDep, employee_id: int) -> EmployeeRead:
-    employee = service.get_employee(session, employee_id)
+    employee = employees_service.get_employee(session, employee_id)
     if employee is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"Employee {employee_id} does not exist")
     return EmployeeRead.model_validate(employee)
@@ -64,21 +63,21 @@ def replace_skills(
     """Sets the employee's complete set of skills in one transaction: listed skills are
     assigned at their level, all others are removed. Skills come from the catalogue
     (`GET /skills`); unknown ids are rejected. Either all changes apply or none."""
-    if service.get_employee(session, employee_id) is None:
+    if employees_service.get_employee(session, employee_id) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"Employee {employee_id} does not exist")
     try:
-        service.replace_skills(session, employee_id, body.skills)
-    except service.UnknownSkillsError as error:
+        employees_service.replace_skills(session, employee_id, body.skills)
+    except employees_service.UnknownSkillsError as error:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)) from None
     # The existence check loaded the old skills into the session; read the new ones.
     session.expunge_all()
-    employee = service.get_employee(session, employee_id)
+    employee = employees_service.get_employee(session, employee_id)
     assert employee is not None
     return EmployeeRead.model_validate(employee)
 
 
 def _existing_skill(session: Session, employee_id: int, skill_id: int) -> Skill:
-    if service.get_employee(session, employee_id) is None:
+    if employees_service.get_employee(session, employee_id) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"Employee {employee_id} does not exist")
     skill = skills_service.get_skill(session, skill_id)
     if skill is None:
@@ -104,7 +103,7 @@ def assign_skill(
 ) -> SkillAssignmentRead:
     """Idempotent: 201 when the employee did not have the skill yet, 200 otherwise."""
     skill = _existing_skill(session, employee_id, skill_id)
-    if not service.assign_skill(session, employee_id, skill_id, body.level):
+    if not employees_service.assign_skill(session, employee_id, skill_id, body.level):
         response.status_code = status.HTTP_200_OK
     return SkillAssignmentRead(skill=SkillRead.model_validate(skill), level=body.level)
 
@@ -118,4 +117,4 @@ def assign_skill(
 def remove_skill(session: SessionDep, employee_id: int, skill_id: int) -> None:
     """Idempotent: removing a skill the employee does not have is not an error."""
     _existing_skill(session, employee_id, skill_id)
-    service.remove_skill(session, employee_id, skill_id)
+    employees_service.remove_skill(session, employee_id, skill_id)

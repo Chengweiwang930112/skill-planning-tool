@@ -4,7 +4,7 @@ import pytest
 
 from app.models import Employee, ProficiencyLevel
 from app.schemas import EmployeeQuery, SkillLevelWrite
-from app.services.employees import (
+from app.services.employees_service import (
     UnknownSkillsError,
     assign_skill,
     get_employee,

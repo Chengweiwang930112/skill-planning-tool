@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from app.models import Employee, EmployeeImport, ImportStatus
-from app.services.employee_import import IMPORT_LOCK_KEY, import_employees
+from app.services.import_service import IMPORT_LOCK_KEY, import_employees
 from tests.component.conftest import DIALECT
 from tests.factories import make_employee
 

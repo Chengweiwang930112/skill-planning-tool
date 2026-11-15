@@ -7,10 +7,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app import __version__
-from app.api.employees import router as employees_router
-from app.api.health import router as health_router
-from app.api.imports import router as imports_router
-from app.api.skills import router as skills_router
+from app.api.employees_api import router as employees_router
+from app.api.health_api import router as health_router
+from app.api.imports_api import router as imports_router
+from app.api.skills_api import router as skills_router
 from app.core.config import Settings, get_settings
 from app.core.errors import register_error_handlers
 from app.core.frontend import SinglePageApp

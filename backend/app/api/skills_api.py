@@ -3,12 +3,12 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app.api.imports import MAX_UPLOAD_BYTES
+from app.api.imports_api import MAX_UPLOAD_BYTES
 from app.core.database import get_session
 from app.core.errors import problem_response
 from app.models import Skill
 from app.schemas import Page, SkillImportResult, SkillQuery, SkillRead, SkillWithUsage, SkillWrite
-from app.services import skills as service
+from app.services import skills_service
 from app.services.csv_parsing import CsvFileError
 
 router = APIRouter(
@@ -23,13 +23,13 @@ DUPLICATE: Responses = {status.HTTP_409_CONFLICT: problem_response("A skill with
 NOT_FOUND: Responses = {status.HTTP_404_NOT_FOUND: problem_response("Skill not found")}
 
 
-def _conflict(error: service.DuplicateSkillError) -> HTTPException:
+def _conflict(error: skills_service.DuplicateSkillError) -> HTTPException:
     detail = f"The catalogue already has {error.existing.name} (skill {error.existing.id})"
     return HTTPException(status.HTTP_409_CONFLICT, detail)
 
 
 def _existing(session: Session, skill_id: int) -> Skill:
-    skill = service.get_skill(session, skill_id)
+    skill = skills_service.get_skill(session, skill_id)
     if skill is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"Skill {skill_id} does not exist")
     return skill
@@ -39,7 +39,7 @@ def _existing(session: Session, skill_id: int) -> Skill:
 def list_skills(session: SessionDep, query: Annotated[SkillQuery, Query()]) -> Page[SkillWithUsage]:
     """Alphabetically, with how many employees have each skill; `q` narrows the list down,
     e.g. for autocompletion, ignoring case, spaces and punctuation."""
-    rows, total = service.list_skills(session, query)
+    rows, total = skills_service.list_skills(session, query)
     return Page(
         items=[
             SkillWithUsage(id=skill.id, name=skill.name, employee_count=count)
@@ -56,8 +56,8 @@ def create_skill(session: SessionDep, body: SkillWrite) -> SkillRead:
     """Names must be unique ignoring case, spaces and punctuation, so that the catalogue
     does not end up with Node.js next to NodeJS."""
     try:
-        return SkillRead.model_validate(service.create_skill(session, body.name))
-    except service.DuplicateSkillError as error:
+        return SkillRead.model_validate(skills_service.create_skill(session, body.name))
+    except skills_service.DuplicateSkillError as error:
         raise _conflict(error) from None
 
 
@@ -66,8 +66,8 @@ def rename_skill(session: SessionDep, skill_id: int, body: SkillWrite) -> SkillR
     """Every employee with the skill shows the new name."""
     skill = _existing(session, skill_id)
     try:
-        return SkillRead.model_validate(service.rename_skill(session, skill, body.name))
-    except service.DuplicateSkillError as error:
+        return SkillRead.model_validate(skills_service.rename_skill(session, skill, body.name))
+    except skills_service.DuplicateSkillError as error:
         raise _conflict(error) from None
 
 
@@ -83,8 +83,8 @@ def rename_skill(session: SessionDep, skill_id: int, body: SkillWrite) -> SkillR
 def delete_skill(session: SessionDep, skill_id: int) -> None:
     skill = _existing(session, skill_id)
     try:
-        service.delete_skill(session, skill)
-    except service.SkillInUseError as error:
+        skills_service.delete_skill(session, skill)
+    except skills_service.SkillInUseError as error:
         raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from None
 
 
@@ -105,6 +105,6 @@ def import_skills(
     if len(content) > MAX_UPLOAD_BYTES:
         raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "The file is larger than 10 MB")
     try:
-        return service.import_skills(session, content)
+        return skills_service.import_skills(session, content)
     except CsvFileError as error:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)) from None

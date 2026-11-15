@@ -52,9 +52,9 @@ flowchart LR
     migrate["One-off task<br/>alembic upgrade head"] -. before each rollout .-> db
 ```
 
-The backend is layered thinly: `app/api` handles HTTP (status codes, problem
-details), `app/services` holds the queries and rules, `app/models.py` the
-schema; the Pydantic models in `app/schemas.py` are the API contract, and the
+The backend is layered thinly: the routers in `app/api` (`*_api.py`) handle
+HTTP (status codes, problem details), the services in `app/services`
+(`*_service.py`) hold the queries and rules, `app/models.py` the schema; the Pydantic models in `app/schemas.py` are the API contract, and the
 frontend's types are generated from it. The reasoning behind the main choices
 is in the [architecture decision records](docs/adr/README.md).
 
