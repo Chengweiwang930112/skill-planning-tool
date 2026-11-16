@@ -346,7 +346,7 @@ it writes HTML coverage reports to `backend/htmlcov/index.html` and
 ## CI/CD
 
 One workflow, [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml),
-runs six stages. GitHub Actions has no stage keyword: a stage is the jobs
+runs seven stages. GitHub Actions has no stage keyword: a stage is the jobs
 that share the same `needs`, so they run in parallel, and the next stage starts
 once all of them have passed.
 
@@ -354,8 +354,9 @@ once all of them have passed.
 flowchart LR
     lint["Lint<br/>backend · frontend"] --> test["Test<br/>backend · frontend"]
     test --> gate["Quality gate<br/>SonarQube (simulated)"]
-    gate --> build["Build image<br/>smoke test · Trivy scan"]
-    build --> push["Push to ECR<br/>(simulated)"]
+    gate --> build["Build image<br/>smoke test"]
+    build --> scan["Scan image<br/>Trivy"]
+    scan --> push["Push to ECR<br/>(simulated)"]
     push --> approve{{"Manual approval"}}
     approve --> deploy["Deploy to ECS<br/>(simulated)"]
 ```
@@ -365,12 +366,13 @@ flowchart LR
 | Lint          | backend: ruff, ruff format, mypy · frontend: ESLint, Prettier, TypeScript compiler                                     |
 | Test          | backend: unit, component and integration tests as three jobs, `alembic check` · frontend: Vitest, API types up to date |
 | Quality gate  | backend unit + component coverage combined, at least 80%; SonarQube with it and the frontend's (simulated)             |
-| Build image   | the root `Dockerfile`, started like `make up`; smoke test; [Trivy](https://trivy.dev) scan                             |
+| Build image   | the root `Dockerfile`, started like `make up`; smoke test; the image kept as an artifact for a day                     |
+| Scan image    | [Trivy](https://trivy.dev): lists the image's vulnerabilities of every severity; reports only, never fails yet         |
 | Push to ECR   | prints what it would push (simulated)                                                                                  |
 | Deploy to ECS | after a manual approval, prints what it would deploy (simulated)                                                       |
 
-Pull requests run lint, test, quality gate and build; pushes to `main` run all
-six stages.
+Pull requests run lint, test, quality gate, build and scan; pushes to `main`
+run all seven stages.
 The deployment waits for a click: the job uses the `production` environment,
 and the run pauses at **Review deployments** until a reviewer approves. That
 rule lives in the repository settings, not in the workflow — *Settings →
