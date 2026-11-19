@@ -134,27 +134,6 @@ export interface paths {
         patch: operations["rename_skill_api_v1_skills__skill_id__patch"];
         trace?: never;
     };
-    "/api/v1/skills/import": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Add skills from a CSV file
-         * @description Adds every name not yet in the catalogue; importing the same file again changes
-         *     nothing. Meant for moving an existing list of skills in at once.
-         */
-        post: operations["import_skills_api_v1_skills_import_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/imports": {
         parameters: {
             query?: never;
@@ -282,14 +261,6 @@ export interface components {
              * @description CSV with a header row. Required columns: employee_number, first_name, last_name, email;
              *     optional: department, job_title, location, hire_date. Comma, semicolon or tab separated; UTF-8 or
              *     Windows-1252; dates as YYYY-MM-DD or DD.MM.YYYY. At most 10 MB and 50,000 rows.
-             */
-            file: string;
-        };
-        /** Body_import_skills_api_v1_skills_import_post */
-        Body_import_skills_api_v1_skills_import_post: {
-            /**
-             * File
-             * @description CSV with a `name` column; UTF-8 or Windows-1252.
              */
             file: string;
         };
@@ -712,22 +683,6 @@ export interface components {
              * @enum {string}
              */
             level: "beginner" | "intermediate" | "advanced" | "expert";
-        };
-        /** SkillImportResult */
-        SkillImportResult: {
-            /**
-             * Rows Created
-             * @example 24
-             */
-            rows_created: number;
-            /**
-             * Rows Existing
-             * @description Names already in the catalogue or earlier in the file.
-             * @example 3
-             */
-            rows_existing: number;
-            /** Row Errors */
-            row_errors: components["schemas"]["RowErrorRead"][];
         };
         /** SkillLevelWrite */
         SkillLevelWrite: {
@@ -1175,48 +1130,6 @@ export interface operations {
             };
             /** @description A skill with this name exists */
             409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProblemDetail"];
-                };
-            };
-            /** @description Invalid parameters */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProblemDetail"];
-                };
-            };
-        };
-    };
-    import_skills_api_v1_skills_import_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "multipart/form-data": components["schemas"]["Body_import_skills_api_v1_skills_import_post"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SkillImportResult"];
-                };
-            };
-            /** @description File larger than 10 MB */
-            413: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -104,8 +104,8 @@ start Docker Desktop once, and check:
 git --version && uv --version && node --version && npm --version && docker --version && make --version
 ```
 
-`make start` needs ports 5432, 8000 and 4200 free, `make up` 8080, and
-`make test` 5433. On Linux and macOS the same tools apply, except make: run the
+`make start` needs ports 5432, 8000 and 4200 free, `make up` and `make setup`
+5432 and 8080, and `make test` 5434. On Linux and macOS the same tools apply, except make: run the
 steps below the shortcuts instead.
 
 ## Quick start
@@ -113,7 +113,7 @@ steps below the shortcuts instead.
 ### Everything at once
 
 ```bash
-make setup     # first run: install dependencies, build the image, start, add demo data
+make setup     # first run: install dependencies, run everything as containers, add skills and demo data
 make start     # database, migrations, then backend and frontend in their own windows
 make up        # or: everything as containers, built from the image, on :8080
 make stop      # stop backend, frontend and all containers (data is kept)
@@ -123,11 +123,13 @@ make test      # all tests with coverage reports, against a throwaway database
 ```
 
 `make setup` is all a fresh clone needs: it installs the backend's and the
-frontend's dependencies from their lockfiles, builds the container image (which
-builds the frontend for production, so `make up` works straight away), runs
-`make start`, and fills the database with fictional demo data if it has no
-employees yet. Running it again reinstalls the dependencies and leaves the data
-alone.
+frontend's dependencies from their lockfiles (for development and the tests),
+runs the application as containers like `make up`, on http://localhost:8080,
+adds the 44 skills of `samples/skills.txt` to the catalogue through its API,
+and fills the database with fictional demo employees if it has none yet. Running it
+again reinstalls the dependencies and leaves the data alone: skills the
+catalogue has are skipped, and the demo employees are only added to a database
+without employees.
 
 The `Makefile` is for Windows and runs its commands in cmd, so it works the
 same from cmd, PowerShell and Git Bash; each target is the handful of commands
@@ -156,6 +158,9 @@ uv run alembic upgrade head           # apply migrations
 uv run python -m scripts.seed         # optional: fictional demo data (empty database only)
 uv run uvicorn app.main:app --reload  # http://localhost:8000/docs
 ```
+
+With the backend running, `uv run python -m scripts.add_skills ../samples/skills.txt`
+adds a starter list of skills to the catalogue (see [Skill catalogue](#skill-catalogue)).
 
 The API is documented with OpenAPI. Swagger UI at `/docs` lists every endpoint
 with its parameters, response schemas and error responses, and **Try it out**
@@ -223,11 +228,9 @@ How the image is deployed to ECS is described in
 ## Skill catalogue
 
 Skills come from one managed list, so the same skill is never stored under two
-spellings. The catalogue page (`/skills`) adds, renames and removes skills, and
-imports a CSV file with a `name` column (`samples/skills.csv` has 44 to start
-with). Everywhere else, skills can only be chosen from the catalogue: the skill
-inputs on the employee panel and the search page accept a suggestion, never
-free text.
+spellings. The catalogue page (`/skills`) adds, renames and removes skills.
+Everywhere else, skills can only be chosen from the catalogue: the skill inputs
+on the employee panel and the search page accept a suggestion, never free text.
 
 - **Names are unique ignoring case, spaces and punctuation**, so `Node.js`,
   `nodejs` and `Node JS` are one skill. `+` and `#` count as letters (`plus`,
@@ -237,9 +240,12 @@ free text.
 - **Renaming** changes the name for everyone who has the skill; renaming into
   another skill's name is refused rather than merging the two.
 - **Removing** is only possible while nobody has the skill.
-- **Importing** adds the names that are new and leaves existing ones alone, so
-  importing the same file again changes nothing; over-long names are reported
-  per row.
+- **No import of skills.** The case asks for importing employees only, and a
+  catalogue of a few dozen names is set up once. For that first setup,
+  `scripts/add_skills.py` adds a list of names, one per line, through
+  `POST /api/v1/skills`, skipping those the catalogue has (`409`), so it can run
+  again and against any running instance; `make setup` runs it with the 44 names
+  of `samples/skills.txt`.
 
 | Endpoint                            | Does                                                          |
 | ----------------------------------- | ------------------------------------------------------------- |
@@ -247,7 +253,6 @@ free text.
 | `POST /api/v1/skills`               | add; `409` names the existing skill on a clash                |
 | `PATCH /api/v1/skills/{id}`         | rename; `409` on a clash                                      |
 | `DELETE /api/v1/skills/{id}`        | remove; `409` while employees have it                         |
-| `POST /api/v1/skills/import`        | add the names from a CSV file                                 |
 | `PUT /api/v1/employees/{id}/skills` | set an employee's skills by `skill_id`; unknown ids are `422` |
 
 ## Departments and locations
@@ -326,7 +331,7 @@ The files in `samples/` cover these cases:
 | `employees-excel-de.csv`     | a German Excel export: Windows-1252, `;`, CRLF, `DD.MM.YYYY` |
 | `employees-with-errors.csv`  | one example of each row error next to valid rows             |
 | `employees-20000.csv`        | 20,000 fictional employees, for trying the import at volume  |
-| `skills.csv`                 | 44 skills for the catalogue, imported on the `/skills` page  |
+| `skills.txt`                 | 44 skills for a starter catalogue, added by `make setup`     |
 
 `employees-20000.csv` is generated and can be recreated byte for byte, or at
 another size: `cd backend && uv run python -m scripts.generate_employees 20000 ../samples/employees-20000.csv`.
@@ -371,11 +376,10 @@ frontend's specs follow the same structure, next to the code they test as
 Angular expects.
 
 `make test` runs both suites at once, against a database of its own (`test-db`,
-port 5433, in memory) that it removes afterwards, even when tests fail, so it
+port 5434, in memory) that it removes afterwards, even when tests fail, so it
 never touches the development database. If something else already listens on
-5433, such as a locally installed PostgreSQL, the integration tests fail with
-*password authentication failed*; `make test TEST_DB_PORT=5434` picks another
-port. Besides the summary in the terminal,
+5434, the test database does not start (*ports are not available*);
+`make test TEST_DB_PORT=5435` picks another port. Besides the summary in the terminal,
 it writes HTML coverage reports to `backend/htmlcov/index.html` and
 `frontend/coverage/frontend/lcov-report/index.html`, plus `backend/coverage.xml`
 (Cobertura) and `frontend/coverage/frontend/lcov.info` for other tools.

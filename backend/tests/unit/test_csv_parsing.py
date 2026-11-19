@@ -4,13 +4,7 @@ from pathlib import Path
 import pytest
 
 from app.services import csv_parsing
-from app.services.csv_parsing import (
-    CsvFileError,
-    ParsedName,
-    RowError,
-    parse_employee_csv,
-    parse_skill_csv,
-)
+from app.services.csv_parsing import CsvFileError, parse_employee_csv
 
 SAMPLES = Path(__file__).parents[3] / "samples"
 HEADER = "employee_number,first_name,last_name,email"
@@ -142,51 +136,3 @@ def test_rejects_files_with_too_many_rows(monkeypatch: pytest.MonkeyPatch) -> No
     # When / Then
     with pytest.raises(CsvFileError, match="more than 2 rows"):
         parse_employee_csv(f"{HEADER}\n{rows}".encode())
-
-
-def test_reads_skill_names_from_the_name_column() -> None:
-    # Given
-    content = "Category;Name\nCloud;  Apache   Kafka \n;\nWeb;Node.js\n".encode("cp1252")
-
-    # When
-    names, errors = parse_skill_csv(content)
-
-    # Then
-    assert names == [ParsedName(2, "Apache Kafka"), ParsedName(4, "Node.js")]
-    assert errors == []
-
-
-def test_reports_skill_names_that_are_too_long() -> None:
-    # Given
-    content = f"name\nGo\n{'x' * 101}\n".encode()
-
-    # When
-    names, errors = parse_skill_csv(content)
-
-    # Then
-    assert names == [ParsedName(2, "Go")]
-    assert errors == [RowError(3, "name", "String should have at most 100 characters")]
-
-
-@pytest.mark.parametrize(
-    ("content", "message"),
-    [
-        (b"", "The file is empty"),
-        (b"skill\nGo\n", "Missing required column: name"),
-        (b"name\n\n  \n", "The file has no skill names"),
-    ],
-    ids=["empty", "no-name-column", "no-names"],
-)
-def test_rejects_unusable_skill_files(content: bytes, message: str) -> None:
-    # When / Then
-    with pytest.raises(CsvFileError, match=f"^{message}$"):
-        parse_skill_csv(content)
-
-
-def test_rejects_skill_files_with_too_many_rows(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Given
-    monkeypatch.setattr(csv_parsing, "MAX_ROWS", 2)
-
-    # When / Then
-    with pytest.raises(CsvFileError, match="more than 2 rows"):
-        parse_skill_csv(b"name\nGo\nRust\nZig\n")

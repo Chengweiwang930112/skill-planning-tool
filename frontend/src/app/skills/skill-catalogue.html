@@ -43,47 +43,6 @@
       <p class="si-caption text-success mt-2 mb-0" role="status">Added {{ skill.name }}.</p>
     }
   </section>
-
-  <section class="col-lg-6">
-    <h2 class="si-h4 mb-4">Import skills</h2>
-    @if (importing(); as fileName) {
-      <div class="d-flex align-items-center gap-4 py-6 justify-content-center" role="status">
-        <si-loading-spinner />
-        <span>Importing {{ fileName }}…</span>
-      </div>
-    } @else {
-      <si-file-dropzone
-        accept=".csv,text/csv"
-        acceptText="Accepted file type: CSV with a name column"
-        [maxFileSize]="maxUploadBytes"
-        uploadDropText="Drop a CSV file here or click to choose one"
-        (filesAdded)="upload($event)"
-        (fileError)="rejectFile($event)"
-      />
-    }
-    @if (importError(); as message) {
-      <si-inline-notification
-        class="d-block mt-4"
-        severity="danger"
-        heading="The file could not be imported."
-        [message]="message"
-      />
-    } @else if (imported(); as result) {
-      <si-inline-notification
-        class="d-block mt-4"
-        [severity]="result.row_errors.length ? 'warning' : 'success'"
-        heading="Import finished."
-        [message]="importSummary(result)"
-      />
-      @if (result.row_errors.length) {
-        <ul class="si-caption mt-2 mb-0" aria-label="Skipped rows">
-          @for (error of result.row_errors; track error.row) {
-            <li>Row {{ error.row }}: {{ error.message }}</li>
-          }
-        </ul>
-      }
-    }
-  </section>
 </div>
 
 <section>
@@ -109,7 +68,7 @@
       <si-empty-state
         icon="element-list"
         [heading]="q() ? 'No skills match your search' : 'The catalogue is empty'"
-        [content]="q() ? 'Try a different name.' : 'Add a skill or import a CSV file of skills.'"
+        [content]="q() ? 'Try a different name.' : 'Add the first skill above.'"
       />
     } @else {
       <p class="text-secondary mb-4">

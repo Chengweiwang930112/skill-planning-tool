@@ -12,9 +12,12 @@ which defeats the purpose of the application.
 ## Decision
 
 - **Skills come from a catalogue.** The catalogue page adds, renames and
-  removes skills, and imports a CSV of names. Everywhere else, skills are chosen
-  from the catalogue's suggestions; typed text that is not a suggestion is
-  neither assigned nor searched for, and the API assigns skills by id only.
+  removes skills. There is no import of skills: the case asks for importing
+  employees only, and a catalogue of a few dozen names is set up once, for
+  which `scripts/add_skills.py` adds a list of names through the API.
+  Everywhere else, skills are chosen from the catalogue's suggestions; typed
+  text that is not a suggestion is neither assigned nor searched for, and the
+  API assigns skills by id only.
 - **Names are unique by a normalised key**: case folded, `+` and `#` spelled
   out as `plus` and `sharp`, everything but letters and digits removed. So
   `Node.js` = `nodejs` = `Node JS`, while `C`, `C++` and `C#` stay apart. The

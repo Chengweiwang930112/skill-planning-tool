@@ -1,4 +1,6 @@
-"""Fill an empty database with fictional demo data: `uv run python -m scripts.seed`."""
+"""Fill a database without employees with fictional demo employees and their skills:
+`uv run python -m scripts.seed`. Skills the catalogue already has are used, the others
+added."""
 
 from datetime import date
 
@@ -6,7 +8,15 @@ from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.models import Department, Employee, EmployeeSkill, Location, ProficiencyLevel, Skill
+from app.models import (
+    Department,
+    Employee,
+    EmployeeSkill,
+    Location,
+    ProficiencyLevel,
+    Skill,
+    name_key,
+)
 
 BEG, INT, ADV, EXP = (
     ProficiencyLevel.BEGINNER,
@@ -14,8 +24,6 @@ BEG, INT, ADV, EXP = (
     ProficiencyLevel.ADVANCED,
     ProficiencyLevel.EXPERT,
 )
-
-SKILLS = ["Python", "Kubernetes", "Angular", "TypeScript", "AWS", "PostgreSQL", "Terraform", "Go"]
 
 EMPLOYEES = [
     ("E-1001", "Anna", "Schmidt", "Digital Industries", "Senior Software Engineer", "Munich",
@@ -55,7 +63,14 @@ def _insert(session: Session) -> None:
         print("Database already has employees, nothing to do.")
         return
 
-    skills = {name: Skill(name=name) for name in SKILLS}
+    needed = {name for *_, levels in EMPLOYEES for name in levels}
+    catalogue = {
+        skill.key: skill
+        for skill in session.scalars(
+            select(Skill).where(Skill.key.in_([name_key(name) for name in needed]))
+        )
+    }
+    skills = {name: catalogue.get(name_key(name)) or Skill(name=name) for name in needed}
     departments = {row[3]: Department(name=row[3]) for row in EMPLOYEES}
     locations = {row[5]: Location(name=row[5]) for row in EMPLOYEES if row[5]}
     for number, first, last, department, title, location, hired, levels in EMPLOYEES:
@@ -71,7 +86,7 @@ def _insert(session: Session) -> None:
             skills=[EmployeeSkill(skill=skills[s], level=lvl) for s, lvl in levels.items()],
         )
         session.add(employee)
-    print(f"Seeded {len(EMPLOYEES)} employees and {len(SKILLS)} skills.")
+    print(f"Seeded {len(EMPLOYEES)} employees, adding {len(needed) - len(catalogue)} skills.")
 
 
 if __name__ == "__main__":

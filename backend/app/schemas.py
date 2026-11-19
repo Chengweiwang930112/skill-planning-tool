@@ -130,14 +130,6 @@ class SkillWrite(BaseModel):
     )
 
 
-class SkillImportResult(BaseModel):
-    rows_created: int = Field(examples=[24])
-    rows_existing: int = Field(
-        description="Names already in the catalogue or earlier in the file.", examples=[3]
-    )
-    row_errors: list["RowErrorRead"]
-
-
 class SkillAssignmentWrite(BaseModel):
     level: Level = Field(examples=["advanced"])
 

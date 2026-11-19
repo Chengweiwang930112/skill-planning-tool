@@ -10,7 +10,6 @@ from app.services.skills_service import (
     SkillInUseError,
     create_skill,
     delete_skill,
-    import_skills,
     list_skills,
     rename_skill,
 )
@@ -146,34 +145,3 @@ def test_refuses_to_delete_a_skill_someone_has(session: MagicMock) -> None:
     with pytest.raises(SkillInUseError, match="assigned to 3 employees"):
         delete_skill(session, GO)
     session.delete.assert_not_called()
-
-
-def test_imports_each_new_name_once_and_leaves_existing_ones_alone(session: MagicMock) -> None:
-    # Given
-    session.scalars.return_value.all.return_value = [21]
-    content = b"name\nNode.js\nGo\nnodejs\n"
-
-    # When
-    result = import_skills(session, content)
-
-    # Then
-    assert (result.rows_created, result.rows_existing) == (1, 2)
-    statement = sql(session.scalars.call_args.args[0])
-    assert "('Node.js', 'nodejs')" in statement
-    assert "('Go', 'go')" in statement
-    assert "'nodejs', 'nodejs'" not in statement
-    assert "ON CONFLICT (key) DO NOTHING" in statement
-    session.commit.assert_called_once()
-
-
-def test_a_file_with_only_invalid_names_inserts_nothing(session: MagicMock) -> None:
-    # Given
-    content = f"name\n{'x' * 101}\n".encode()
-
-    # When
-    result = import_skills(session, content)
-
-    # Then
-    assert (result.rows_created, len(result.row_errors)) == (0, 1)
-    session.scalars.assert_not_called()
-    session.commit.assert_not_called()

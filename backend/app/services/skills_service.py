@@ -6,8 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import EmployeeSkill, Skill, name_key
-from app.schemas import NameQuery, RowErrorRead, SkillImportResult
-from app.services.csv_parsing import parse_skill_csv
+from app.schemas import NameQuery
 
 
 class DuplicateSkillError(Exception):
@@ -80,26 +79,6 @@ def delete_skill(session: Session, skill: Skill) -> None:
         raise SkillInUseError(employee_count)
     session.delete(skill)
     session.commit()
-
-
-def import_skills(session: Session, content: bytes) -> SkillImportResult:
-    """Adds the names in a CSV to the catalogue; names it already has are left alone."""
-    names, errors = parse_skill_csv(content)
-    unique = {name_key(parsed.name): parsed.name for parsed in reversed(names)}
-    created: Sequence[int] = []
-    if unique:
-        created = session.scalars(
-            insert(Skill)
-            .values([{"name": name, "key": key} for key, name in unique.items()])
-            .on_conflict_do_nothing(index_elements=[Skill.key])
-            .returning(Skill.id)
-        ).all()
-        session.commit()
-    return SkillImportResult(
-        rows_created=len(created),
-        rows_existing=len(names) - len(created),
-        row_errors=[RowErrorRead(row=e.row, field=e.field, message=e.message) for e in errors],
-    )
 
 
 def get_skill(session: Session, skill_id: int) -> Skill | None:

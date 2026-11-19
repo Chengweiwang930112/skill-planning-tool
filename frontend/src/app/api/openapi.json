@@ -685,58 +685,6 @@
         }
       }
     },
-    "/api/v1/skills/import": {
-      "post": {
-        "tags": [
-          "skills"
-        ],
-        "summary": "Add skills from a CSV file",
-        "description": "Adds every name not yet in the catalogue; importing the same file again changes\nnothing. Meant for moving an existing list of skills in at once.",
-        "operationId": "import_skills_api_v1_skills_import_post",
-        "requestBody": {
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "$ref": "#/components/schemas/Body_import_skills_api_v1_skills_import_post"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SkillImportResult"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Invalid parameters",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "File larger than 10 MB",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/imports": {
       "post": {
         "tags": [
@@ -1130,21 +1078,6 @@
           "file"
         ],
         "title": "Body_create_import_api_v1_imports_post"
-      },
-      "Body_import_skills_api_v1_skills_import_post": {
-        "properties": {
-          "file": {
-            "type": "string",
-            "contentMediaType": "application/octet-stream",
-            "title": "File",
-            "description": "CSV with a `name` column; UTF-8 or Windows-1252."
-          }
-        },
-        "type": "object",
-        "required": [
-          "file"
-        ],
-        "title": "Body_import_skills_api_v1_skills_import_post"
       },
       "DepartmentRead": {
         "properties": {
@@ -1976,39 +1909,6 @@
           "level"
         ],
         "title": "SkillAssignmentWrite"
-      },
-      "SkillImportResult": {
-        "properties": {
-          "rows_created": {
-            "type": "integer",
-            "title": "Rows Created",
-            "examples": [
-              24
-            ]
-          },
-          "rows_existing": {
-            "type": "integer",
-            "title": "Rows Existing",
-            "description": "Names already in the catalogue or earlier in the file.",
-            "examples": [
-              3
-            ]
-          },
-          "row_errors": {
-            "items": {
-              "$ref": "#/components/schemas/RowErrorRead"
-            },
-            "type": "array",
-            "title": "Row Errors"
-          }
-        },
-        "type": "object",
-        "required": [
-          "rows_created",
-          "rows_existing",
-          "row_errors"
-        ],
-        "title": "SkillImportResult"
       },
       "SkillLevelWrite": {
         "properties": {

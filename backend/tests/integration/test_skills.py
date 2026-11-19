@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 
 from app.models import ProficiencyLevel, Skill
 from tests.factories import make_employee, persist
-from tests.integration.conftest import SAMPLES
 
 URL = "/api/v1/skills"
 
@@ -21,10 +20,6 @@ def create(client: TestClient, name: str) -> Any:
 
 def names(client: TestClient, **params: Any) -> list[str]:
     return [skill["name"] for skill in client.get(URL, params=params).json()["items"]]
-
-
-def upload(client: TestClient, content: bytes) -> Any:
-    return client.post(f"{URL}/import", files={"file": ("skills.csv", content, "text/csv")})
 
 
 def skill_count(session: Session) -> int | None:
@@ -160,48 +155,3 @@ def test_refuses_to_delete_a_skill_someone_has(client: TestClient, session: Sess
     assert response.status_code == status.HTTP_409_CONFLICT
     assert response.json()["detail"] == "The skill is assigned to 1 employees"
     assert skill_count(session) == 1
-
-
-def test_imports_the_new_names_of_a_file(client: TestClient, session: Session) -> None:
-    # Given
-    persist(session, Skill(name="Kubernetes"))
-    content = (
-        "Name;Category\nkubernetes;Cloud\nApache   Kafka;Data\nNode.js;Web\nnodejs;Web\n"
-        f"{'x' * 101};Too long\n;\n"
-    ).encode("cp1252")
-
-    # When
-    response = upload(client, content)
-
-    # Then
-    assert response.json() == {
-        "rows_created": 2,
-        "rows_existing": 2,
-        "row_errors": [
-            {"row": 6, "field": "name", "message": "String should have at most 100 characters"}
-        ],
-    }
-    assert names(client) == ["Apache Kafka", "Kubernetes", "Node.js"]
-
-
-def test_importing_the_sample_twice_adds_its_skills_once(client: TestClient) -> None:
-    # Given
-    content = (SAMPLES / "skills.csv").read_bytes()
-    first = upload(client, content).json()
-
-    # When
-    second = upload(client, content).json()
-
-    # Then
-    assert (first["rows_created"], first["rows_existing"]) == (44, 0)
-    assert (second["rows_created"], second["rows_existing"]) == (0, 44)
-    assert client.get(URL).json()["total"] == 44
-
-
-def test_rejects_an_unusable_skill_file(client: TestClient) -> None:
-    # When
-    response = upload(client, b"skill\nGo\n")
-
-    # Then
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
-    assert response.json()["detail"] == "Missing required column: name"

@@ -5,10 +5,8 @@ import {
   TestRequest,
 } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { SiActionDialogService } from '@siemens/element-ng/action-modal';
-import { SiFileDropzoneComponent } from '@siemens/element-ng/file-uploader';
 import { of } from 'rxjs';
 import type { SkillPage, SkillWithUsage } from '../api/models';
 import { PAGE_SIZE, SkillCatalogue } from './skill-catalogue';
@@ -203,38 +201,6 @@ describe('SkillCatalogue', () => {
   it('cannot remove a skill that employees have', () => {
     // Then
     expect(button('Remove Python').disabled).toBe(true);
-  });
-
-  it('imports a CSV file of skills and reports what happened', async () => {
-    // Given
-    const file = new File(['name\nRust\n'], 'skills.csv');
-
-    // When
-    fixture.debugElement
-      .query(By.directive(SiFileDropzoneComponent))
-      .componentInstance.filesAdded.emit([
-        { file, fileName: 'skills.csv', status: 'added', size: '1 KB', progress: 0 },
-      ]);
-    await settle();
-
-    // Then
-    expect(view().textContent).toContain('Importing skills.csv…');
-
-    const upload = http.expectOne({ method: 'POST', url: '/api/v1/skills/import' });
-    expect((upload.request.body as FormData).get('file')).toEqual(file);
-
-    // When
-    upload.flush({
-      rows_created: 1,
-      rows_existing: 2,
-      row_errors: [{ row: 5, field: 'name', message: 'String should have at most 100 characters' }],
-    });
-    await settle();
-
-    // Then
-    expect(view().textContent).toContain('1 added, 2 already in the catalogue, 1 row skipped.');
-    expect(view().textContent).toContain('Row 5: String should have at most 100 characters');
-    (await list()).flush(page([GO, PYTHON]));
   });
 
   it('says when no skill matches the search', async () => {

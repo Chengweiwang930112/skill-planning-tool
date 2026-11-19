@@ -1,15 +1,13 @@
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.imports_api import MAX_UPLOAD_BYTES
 from app.core.database import get_session
 from app.core.errors import problem_response
 from app.models import Skill
-from app.schemas import NameQuery, Page, SkillImportResult, SkillRead, SkillWithUsage, SkillWrite
+from app.schemas import NameQuery, Page, SkillRead, SkillWithUsage, SkillWrite
 from app.services import skills_service
-from app.services.csv_parsing import CsvFileError
 
 router = APIRouter(
     prefix="/skills",
@@ -86,25 +84,3 @@ def delete_skill(session: SessionDep, skill_id: int) -> None:
         skills_service.delete_skill(session, skill)
     except skills_service.SkillInUseError as error:
         raise HTTPException(status.HTTP_409_CONFLICT, str(error)) from None
-
-
-@router.post(
-    "/import",
-    summary="Add skills from a CSV file",
-    responses={status.HTTP_413_CONTENT_TOO_LARGE: problem_response("File larger than 10 MB")},
-)
-def import_skills(
-    session: SessionDep,
-    file: Annotated[
-        UploadFile, File(description="CSV with a `name` column; UTF-8 or Windows-1252.")
-    ],
-) -> SkillImportResult:
-    """Adds every name not yet in the catalogue; importing the same file again changes
-    nothing. Meant for moving an existing list of skills in at once."""
-    content = file.file.read(MAX_UPLOAD_BYTES + 1)
-    if len(content) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "The file is larger than 10 MB")
-    try:
-        return skills_service.import_skills(session, content)
-    except CsvFileError as error:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)) from None

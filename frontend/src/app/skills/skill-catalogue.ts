@@ -6,22 +6,15 @@ import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import { SiActionDialogService } from '@siemens/element-ng/action-modal';
 import { SiBreadcrumbComponent } from '@siemens/element-ng/breadcrumb';
 import { SiEmptyStateComponent } from '@siemens/element-ng/empty-state';
-import { SiFileDropzoneComponent } from '@siemens/element-ng/file-uploader';
 import { SiInlineNotificationComponent } from '@siemens/element-ng/inline-notification';
 import { SiLoadingSpinnerComponent } from '@siemens/element-ng/loading-spinner';
 import { SiPaginationComponent } from '@siemens/element-ng/pagination';
 import { SiSearchBarComponent } from '@siemens/element-ng/search-bar';
 import { firstValueFrom } from 'rxjs';
-import type { Skill, SkillImportResult, SkillPage, SkillWithUsage } from '../api/models';
+import type { Skill, SkillPage, SkillWithUsage } from '../api/models';
 import { problemMessage } from '../api/problem';
-import { MAX_UPLOAD_BYTES } from '../imports/import-page';
 
 export const PAGE_SIZE = 20;
-
-interface DroppedFile {
-  file: File;
-  status: string;
-}
 
 @Component({
   selector: 'app-skill-catalogue',
@@ -31,7 +24,6 @@ interface DroppedFile {
     RouterLink,
     SiBreadcrumbComponent,
     SiEmptyStateComponent,
-    SiFileDropzoneComponent,
     SiInlineNotificationComponent,
     SiLoadingSpinnerComponent,
     SiPaginationComponent,
@@ -51,7 +43,6 @@ export class SkillCatalogue {
   private readonly route = inject(ActivatedRoute);
 
   protected readonly pageSize = PAGE_SIZE;
-  protected readonly maxUploadBytes = MAX_UPLOAD_BYTES;
   protected readonly skills = httpResource<SkillPage>(() => {
     const q = this.q();
     return {
@@ -73,10 +64,6 @@ export class SkillCatalogue {
   protected readonly editedName = signal('');
   protected readonly renaming = signal(false);
   protected readonly rowError = signal<{ id: number; message: string } | undefined>(undefined);
-
-  protected readonly importing = signal<string | undefined>(undefined);
-  protected readonly imported = signal<SkillImportResult | undefined>(undefined);
-  protected readonly importError = signal<string | undefined>(undefined);
 
   protected async add(): Promise<void> {
     const name = this.newName().trim();
@@ -145,41 +132,6 @@ export class SkillCatalogue {
     } catch (error) {
       this.rowError.set({ id: skill.id, message: problemMessage(error) });
     }
-  }
-
-  protected async upload(files: DroppedFile[]): Promise<void> {
-    const file = files.find((dropped) => dropped.status === 'added')?.file;
-    if (!file) {
-      return;
-    }
-    const body = new FormData();
-    body.append('file', file, file.name);
-    this.importing.set(file.name);
-    this.imported.set(undefined);
-    this.importError.set(undefined);
-    try {
-      this.imported.set(
-        await firstValueFrom(this.http.post<SkillImportResult>('/api/v1/skills/import', body)),
-      );
-      this.skills.reload();
-    } catch (error) {
-      this.importError.set(problemMessage(error));
-    } finally {
-      this.importing.set(undefined);
-    }
-  }
-
-  protected rejectFile(error: { errorText: string }): void {
-    this.imported.set(undefined);
-    this.importError.set(error.errorText);
-  }
-
-  protected importSummary(result: SkillImportResult): string {
-    const skipped = result.row_errors.length;
-    return (
-      `${result.rows_created} added, ${result.rows_existing} already in the catalogue` +
-      (skipped ? `, ${skipped} ${skipped === 1 ? 'row' : 'rows'} skipped.` : '.')
-    );
   }
 
   protected search(q: string): void {

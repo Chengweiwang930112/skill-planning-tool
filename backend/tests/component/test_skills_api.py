@@ -4,11 +4,9 @@ import pytest
 from fastapi import status
 from fastapi.testclient import TestClient
 
-from app.api.imports_api import MAX_UPLOAD_BYTES
 from app.models import Skill
-from app.schemas import NameQuery, RowErrorRead, SkillImportResult
+from app.schemas import NameQuery
 from app.services import skills_service
-from app.services.csv_parsing import CsvFileError
 from tests.component.conftest import MockService
 
 URL = "/api/v1/skills"
@@ -157,51 +155,3 @@ def test_an_unknown_skill_is_a_404(
     # Then
     assert response.status_code == status.HTTP_404_NOT_FOUND
     assert response.json()["detail"] == "Skill 999999 does not exist"
-
-
-def test_imports_a_file_of_skills(
-    client: TestClient, session: MagicMock, mock_service: MockService
-) -> None:
-    # Given
-    result = SkillImportResult(
-        rows_created=2,
-        rows_existing=1,
-        row_errors=[RowErrorRead(row=4, field="name", message="too long")],
-    )
-    import_skills = mock_service(skills_service, "import_skills", return_value=result)
-
-    # When
-    response = client.post(f"{URL}/import", files={"file": ("skills.csv", b"name\nGo\n")})
-
-    # Then
-    assert response.json() == result.model_dump()
-    import_skills.assert_called_once_with(session, b"name\nGo\n")
-
-
-def test_an_unusable_skill_file_is_a_422(client: TestClient, mock_service: MockService) -> None:
-    # Given
-    mock_service(
-        skills_service, "import_skills", side_effect=CsvFileError("Missing required column: name")
-    )
-
-    # When
-    response = client.post(f"{URL}/import", files={"file": ("skills.csv", b"skill\nGo\n")})
-
-    # Then
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
-    assert response.json()["detail"] == "Missing required column: name"
-
-
-def test_rejects_a_skill_file_larger_than_the_limit(
-    client: TestClient, mock_service: MockService
-) -> None:
-    # Given
-    import_skills = mock_service(skills_service, "import_skills")
-    content = b"x" * (MAX_UPLOAD_BYTES + 1)
-
-    # When
-    response = client.post(f"{URL}/import", files={"file": ("big.csv", content)})
-
-    # Then
-    assert response.status_code == status.HTTP_413_CONTENT_TOO_LARGE
-    import_skills.assert_not_called()

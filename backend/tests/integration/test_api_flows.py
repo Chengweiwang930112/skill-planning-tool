@@ -31,9 +31,7 @@ def test_skills_assigned_from_the_catalogue_are_found_by_the_skill_search(
     client.post(
         "/api/v1/imports", files={"file": ("e.csv", (SAMPLES / "employees.csv").read_bytes())}
     )
-    client.post(
-        "/api/v1/skills/import", files={"file": ("s.csv", (SAMPLES / "skills.csv").read_bytes())}
-    )
+    client.post("/api/v1/skills", json={"name": "Kubernetes"})
     [anna] = client.get("/api/v1/employees", params={"q": "anna schmidt"}).json()["items"]
     [k8s] = client.get("/api/v1/skills", params={"q": "kubernetes"}).json()["items"]
 
