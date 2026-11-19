@@ -20,7 +20,7 @@ import { problemMessage } from '../api/problem';
 import { LEVELS } from '../shared/level';
 import { SkillPicker, SkillPickerHint } from '../shared/skill-picker';
 
-export interface DraftSkill {
+interface DraftSkill {
   id: number;
   name: string;
   level: Level;

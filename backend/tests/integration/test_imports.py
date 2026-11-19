@@ -45,14 +45,13 @@ def test_importing_the_same_file_again_changes_nothing(
     client: TestClient, session: Session
 ) -> None:
     # Given
-    first = upload(client, sample("employees.csv"))
+    upload(client, sample("employees.csv"))
 
     # When
     second = upload(client, sample("employees.csv"))
 
     # Then
     assert (second["rows_created"], second["rows_unchanged"]) == (0, 12)
-    assert second["file_sha256"] == first["file_sha256"]
     assert count(session, Employee) == 12
     assert count(session, EmployeeImport) == 2
 

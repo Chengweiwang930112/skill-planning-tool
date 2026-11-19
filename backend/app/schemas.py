@@ -253,7 +253,6 @@ class ImportSummary(BaseModel):
     error: str | None = Field(
         description="Why the whole file was rejected, if it was.", examples=[None]
     )
-    file_sha256: str
     created_at: datetime
 
     @computed_field  # type: ignore[prop-decorator]

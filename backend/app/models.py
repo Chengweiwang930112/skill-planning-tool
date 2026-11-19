@@ -152,7 +152,6 @@ class EmployeeImport(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     filename: Mapped[str]
-    file_sha256: Mapped[str] = mapped_column(String(64))
     status: Mapped[ImportStatus] = mapped_column(String)
     rows_succeeded: Mapped[int]
     rows_failed: Mapped[int]

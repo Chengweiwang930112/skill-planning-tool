@@ -33,7 +33,6 @@ def test_imports_an_uploaded_file_and_answers_with_its_record(
         "rows_updated": 1,
         "rows_unchanged": 0,
         "error": None,
-        "file_sha256": "c0a7df61f764",
         "created_at": "2026-11-13T09:30:00Z",
         "row_errors": [{"row": 3, "field": "first_name", "message": "is required"}],
     }

@@ -14,7 +14,7 @@ import { problemMessage } from '../api/problem';
 import { ImportReport } from './import-report';
 import { IMPORT_STATUS } from './status';
 
-export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 export const HISTORY_PAGE_SIZE = 10;
 
 interface DroppedFile {

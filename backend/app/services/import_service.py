@@ -1,4 +1,3 @@
-import hashlib
 import logging
 from collections.abc import Sequence
 from dataclasses import asdict
@@ -22,7 +21,6 @@ def import_employees(session: Session, filename: str, content: bytes) -> Employe
     session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": IMPORT_LOCK_KEY})
     record = EmployeeImport(
         filename=filename,
-        file_sha256=hashlib.sha256(content).hexdigest(),
         rows_created=0,
         rows_updated=0,
         rows_unchanged=0,

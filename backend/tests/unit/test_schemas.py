@@ -171,7 +171,6 @@ def test_an_import_summary_counts_all_rows() -> None:
         rows_updated=1,
         rows_unchanged=8,
         error=None,
-        file_sha256="c0a7",
         created_at=datetime(2026, 11, 13, tzinfo=UTC),
     )
 

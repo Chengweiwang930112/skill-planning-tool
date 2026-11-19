@@ -51,7 +51,6 @@ def make_import(**overrides: Any) -> EmployeeImport:
         "rows_updated": 1,
         "rows_unchanged": 0,
         "error": None,
-        "file_sha256": "c0a7df61f764",
         "created_at": datetime(2026, 11, 13, 9, 30, tzinfo=UTC),
         "row_errors": [{"row": 3, "field": "first_name", "message": "is required"}],
     }

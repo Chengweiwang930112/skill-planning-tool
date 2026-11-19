@@ -385,8 +385,6 @@ export interface components {
              * @example null
              */
             error: string | null;
-            /** File Sha256 */
-            file_sha256: string;
             /**
              * Created At
              * Format: date-time
@@ -453,8 +451,6 @@ export interface components {
              * @example null
              */
             error: string | null;
-            /** File Sha256 */
-            file_sha256: string;
             /**
              * Created At
              * Format: date-time
