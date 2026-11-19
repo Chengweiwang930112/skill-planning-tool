@@ -40,6 +40,3 @@ Thumbs.db
 
 # --- The assignment document itself, which is not ours to redistribute ---
 Case-Study.pdf
-
-# --- Generated (2 MB): scripts/generate_employees recreates it byte for byte ---
-/samples/employees-20000.csv

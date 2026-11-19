@@ -1,5 +1,9 @@
-# Local development on Windows. Run from cmd, PowerShell or Git Bash: `make start`.
+# Local development on Windows. Run from cmd, PowerShell or Git Bash: `make setup` once,
+# then `make start`.
 SHELL := cmd.exe
+
+# The test database's port; another one if 5433 is taken: `make test TEST_DB_PORT=5434`.
+export TEST_DB_PORT ?= 5433
 
 # 127.0.0.1 rather than localhost, which Windows may resolve to ::1 first.
 BACKEND := uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
@@ -8,15 +12,27 @@ FRONTEND := npm start -- --host 127.0.0.1 --port 4200
 STOP_SERVERS := powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 8000,4200 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { taskkill /F /T /PID $$_.OwningProcess }; exit 0"
 
 .DEFAULT_GOAL := help
-.PHONY: help start up stop restart clean test test-backend test-frontend
+.PHONY: help setup start up stop restart clean test test-backend test-frontend
 
 help:
+	@echo make setup    first run: dependencies, the image, then start, with demo data
 	@echo make start    database and migrations, then backend and frontend in their own windows
 	@echo make up       everything as containers built from the image, on port 8080
 	@echo make stop     stop backend, frontend and all containers; data is kept
 	@echo make restart  stop, then start
 	@echo make clean    stop, then delete the containers and the database data; images are kept
 	@echo make test     all tests with coverage reports, against a database of their own
+
+# Repeatable, so also a reset of the dependencies. The servers are stopped first, as
+# npm ci deletes node_modules, which Windows refuses while the frontend runs. The image
+# builds the frontend for production too, so `make up` is ready to go afterwards.
+setup:
+	$(STOP_SERVERS)
+	cd backend && uv sync --locked
+	cd frontend && npm ci
+	docker build --tag skill-planning .
+	$(MAKE) --no-print-directory start
+	cd backend && uv run python -m scripts.seed
 
 # `cmd /c start`, not `start`: from Git Bash, make would run Git's `start` script.
 # No quoted window title: make drops the quotes, and start would open it as a file.
@@ -47,12 +63,12 @@ clean:
 
 # Runs both suites even if one fails, and removes the test database in any case.
 test:
-	docker compose --profile test up --detach --wait test-db
+	docker compose --profile test up --detach --wait test-db || (docker compose --profile test rm --stop --force test-db & exit 1)
 	$(MAKE) --keep-going --no-print-directory test-backend test-frontend || (docker compose --profile test rm --stop --force test-db & exit 1)
 	docker compose --profile test rm --stop --force test-db
 	@echo Coverage: backend\htmlcov\index.html and frontend\coverage\frontend\lcov-report\index.html
 
-test-backend: export APP_TEST_DATABASE_URL := postgresql+psycopg://skills:skills@127.0.0.1:5433/skills_test
+test-backend: export APP_TEST_DATABASE_URL := postgresql+psycopg://skills:skills@127.0.0.1:$(TEST_DB_PORT)/skills_test
 test-backend:
 	cd backend && uv run pytest --cov-report=html --cov-report=xml
 

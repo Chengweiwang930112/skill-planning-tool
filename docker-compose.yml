@@ -22,7 +22,7 @@ services:
     <<: *postgres
     profiles: [test]
     ports:
-      - "5433:5432"
+      - "127.0.0.1:${TEST_DB_PORT:-5433}:5432"
     volumes:
       - ./docker/postgres:/docker-entrypoint-initdb.d:ro
     tmpfs:

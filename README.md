@@ -15,7 +15,7 @@ Kubernetes at an advanced level?"* without asking around in chat.
 
 | Layer    | Choice                                                                     |
 | -------- | -------------------------------------------------------------------------- |
-| Backend  | Python 3.12, FastAPI, SQLAlchemy 2.0, psycopg 3, PostgreSQL, Alembic        |
+| Backend  | Python 3.12, FastAPI, SQLAlchemy 2.1, psycopg 3, PostgreSQL, Alembic        |
 | Frontend | TypeScript, Angular 22 (standalone, signals, zoneless), Siemens Element     |
 | Tooling  | uv, ruff, mypy, pytest · npm, ESLint, Prettier, vitest · Docker, Compose    |
 
@@ -77,16 +77,43 @@ from light petrol to deep blue, as levels are an order rather than a status.
 
 ## Prerequisites
 
-- [uv](https://docs.astral.sh/uv/) (Python toolchain and dependency manager)
-- Node.js 22+ and npm 11+
-- Docker (for PostgreSQL)
-- For the `make` shortcuts: Windows and GNU make, e.g. `scoop install make`
+On a fresh Windows 10 or 11 machine, install these, for example with winget
+from PowerShell:
+
+| Software                                                                         | Version                               | Used for                                              | Install                               |
+| -------------------------------------------------------------------------------- | ------------------------------------- | ----------------------------------------------------- | ------------------------------------- |
+| [Git](https://git-scm.com)                                                       | any recent                            | cloning the repository; Git Bash as a shell           | `winget install Git.Git`              |
+| [uv](https://docs.astral.sh/uv/)                                                 | 0.12 or later                         | Python itself, the backend's dependencies, running it | `winget install astral-sh.uv`         |
+| [Node.js](https://nodejs.org), with npm                                          | 22.22+, 24.15+ or 26+ (Angular's own) | the frontend: dependencies, dev server, build, tests  | `winget install OpenJS.NodeJS.LTS`    |
+| [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/) | any recent, on WSL 2                  | PostgreSQL, the test database, the container image    | `winget install Docker.DockerDesktop` |
+| GNU make                                                                         | 4 or later                            | the `make` shortcuts below                            | `winget install ezwinports.make`      |
+
+Nothing else needs installing on its own:
+
+- **Python 3.12**: uv downloads it when `uv sync` finds no Python 3.12 or
+  later; `uv python install 3.12` gets the version that CI and the image use.
+- **Angular CLI**: a dependency of the frontend, installed by `npm ci` and run
+  through `npm start`, `npm test` and `npm run build`; no global `ng` needed.
+- **PostgreSQL**: runs in Docker; a local installation is not used.
+- **curl and PowerShell**, which `make start` uses, come with Windows.
+
+After installing, open a new terminal (so that the `PATH` changes apply),
+start Docker Desktop once, and check:
+
+```bash
+git --version && uv --version && node --version && npm --version && docker --version && make --version
+```
+
+`make start` needs ports 5432, 8000 and 4200 free, `make up` 8080, and
+`make test` 5433. On Linux and macOS the same tools apply, except make: run the
+steps below the shortcuts instead.
 
 ## Quick start
 
 ### Everything at once
 
 ```bash
+make setup     # first run: install dependencies, build the image, start, add demo data
 make start     # database, migrations, then backend and frontend in their own windows
 make up        # or: everything as containers, built from the image, on :8080
 make stop      # stop backend, frontend and all containers (data is kept)
@@ -94,6 +121,13 @@ make restart
 make clean     # stop, then delete the containers and the database data
 make test      # all tests with coverage reports, against a throwaway database
 ```
+
+`make setup` is all a fresh clone needs: it installs the backend's and the
+frontend's dependencies from their lockfiles, builds the container image (which
+builds the frontend for production, so `make up` works straight away), runs
+`make start`, and fills the database with fictional demo data if it has no
+employees yet. Running it again reinstalls the dependencies and leaves the data
+alone.
 
 The `Makefile` is for Windows and runs its commands in cmd, so it works the
 same from cmd, PowerShell and Git Bash; each target is the handful of commands
@@ -338,7 +372,10 @@ Angular expects.
 
 `make test` runs both suites at once, against a database of its own (`test-db`,
 port 5433, in memory) that it removes afterwards, even when tests fail, so it
-never touches the development database. Besides the summary in the terminal,
+never touches the development database. If something else already listens on
+5433, such as a locally installed PostgreSQL, the integration tests fail with
+*password authentication failed*; `make test TEST_DB_PORT=5434` picks another
+port. Besides the summary in the terminal,
 it writes HTML coverage reports to `backend/htmlcov/index.html` and
 `frontend/coverage/frontend/lcov-report/index.html`, plus `backend/coverage.xml`
 (Cobertura) and `frontend/coverage/frontend/lcov.info` for other tools.
