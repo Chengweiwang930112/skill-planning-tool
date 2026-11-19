@@ -49,7 +49,7 @@ describe('EmployeePanel', () => {
     exits = 0;
     fixture.componentInstance.changed.subscribe((employee) => changes.push(employee));
     fixture.componentInstance.exit.subscribe(() => exits++);
-    (await request('GET', '/api/v1/employees/1')).flush(anna);
+    (await request('GET', '/api/v1/employees/1')).flush(anna, { headers: { ETag: '"v1"' } });
     await settle();
   });
 
@@ -178,6 +178,7 @@ describe('EmployeePanel', () => {
     // Then
     expect(button('Saving…').disabled).toBe(true);
     const save = await request('PUT', '/api/v1/employees/1/skills');
+    expect(save.request.headers.get('If-Match')).toBe('"v1"');
     expect(save.request.body).toEqual({
       skills: [
         { skill_id: 2, level: 'expert' },
@@ -195,13 +196,63 @@ describe('EmployeePanel', () => {
         { skill: { id: 9, name: 'Apache Kafka' }, level: 'beginner' },
       ],
     };
-    save.flush(stored);
+    save.flush(stored, { headers: { ETag: '"v2"' } });
     await settle();
 
     // Then
     expect(changes.at(-1)).toEqual(stored);
     expect(status()).toBe('All changes saved');
     expect(button('Save').disabled).toBe(true);
+
+    // When
+    await setLevel('Python', 'expert');
+    button('Save').click();
+
+    // Then
+    const next = await request('PUT', '/api/v1/employees/1/skills');
+    expect(next.request.headers.get('If-Match')).toBe('"v2"');
+    next.flush(stored, { headers: { ETag: '"v3"' } });
+    await settle();
+  });
+
+  it('offers the latest version when someone else saved changes in the meantime', async () => {
+    // Given
+    await setLevel('Python', 'expert');
+
+    // When
+    button('Save').click();
+    (await request('PUT', '/api/v1/employees/1/skills')).flush(
+      { title: 'Precondition Failed', status: 412, detail: 'The employee has changed' },
+      { status: 412, statusText: 'Precondition Failed' },
+    );
+    await settle();
+
+    // Then
+    expect(view().textContent).toContain('Someone else changed these skills in the meantime.');
+    expect(view().textContent).not.toContain('The changes were not saved.');
+
+    // When
+    button('Load the latest version').click();
+    const latest: Employee = {
+      ...anna,
+      skills: [{ skill: { id: 9, name: 'Apache Kafka' }, level: 'advanced' }],
+    };
+    (await request('GET', '/api/v1/employees/1')).flush(latest, { headers: { ETag: '"v2"' } });
+    await settle();
+
+    // Then
+    expect(shownSkills()).toEqual(['Apache Kafka advanced']);
+    expect(view().textContent).not.toContain('Someone else changed');
+
+    // When
+    await setLevel('Apache Kafka', 'expert');
+    button('Save').click();
+
+    // Then
+    const retry = await request('PUT', '/api/v1/employees/1/skills');
+    expect(retry.request.headers.get('If-Match')).toBe('"v2"');
+    retry.flush(latest, { headers: { ETag: '"v3"' } });
+    await settle();
   });
 
   it('keeps the draft when saving fails, so the user can retry', async () => {

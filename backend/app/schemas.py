@@ -130,10 +130,6 @@ class SkillWrite(BaseModel):
     )
 
 
-class SkillAssignmentWrite(BaseModel):
-    level: Level = Field(examples=["advanced"])
-
-
 class SkillLevelWrite(BaseModel):
     skill_id: int = Field(description="A skill from the catalogue.", examples=[7])
     level: Level = Field(examples=["advanced"])

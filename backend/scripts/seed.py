@@ -78,7 +78,7 @@ def _insert(session: Session) -> None:
             employee_number=number,
             first_name=first,
             last_name=last,
-            email=f"{first}.{last}@example.com".lower().replace("ü", "ue"),
+            email=f"{first}.{last}@siemens.com".lower().replace("ü", "ue"),
             department=departments[department],
             job_title=title,
             location=locations[location] if location else None,

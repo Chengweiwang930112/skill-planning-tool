@@ -1,6 +1,7 @@
+import hashlib
 from collections.abc import Sequence
 
-from sqlalchemy import Select, delete, func, literal_column, or_, select
+from sqlalchemy import Select, delete, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import InstrumentedAttribute, Session, selectinload
 
@@ -9,11 +10,10 @@ from app.models import (
     Employee,
     EmployeeSkill,
     Location,
-    ProficiencyLevel,
     Skill,
     name_key,
 )
-from app.schemas import EmployeeQuery, SkillLevelWrite
+from app.schemas import EmployeeQuery, EmployeeRead, SkillLevelWrite
 
 SORTABLE: dict[str, InstrumentedAttribute[object]] = {
     "last_name": Employee.last_name,
@@ -80,31 +80,16 @@ def get_employee(session: Session, employee_id: int) -> Employee | None:
     return session.get(Employee, employee_id, options=[selectinload(Employee.skills)])
 
 
-def assign_skill(
-    session: Session, employee_id: int, skill_id: int, level: ProficiencyLevel
-) -> bool:
-    """Sets the employee's level for the skill; returns whether the assignment is new."""
-    # xmax is 0 only for a row this statement inserted, not for one it updated.
-    created = session.scalar(
-        insert(EmployeeSkill)
-        .values(employee_id=employee_id, skill_id=skill_id, level=level)
-        .on_conflict_do_update(
-            index_elements=[EmployeeSkill.employee_id, EmployeeSkill.skill_id],
-            set_={"level": level, "updated_at": func.now()},
-        )
-        .returning(literal_column("xmax = 0"))
-    )
-    session.commit()
-    return bool(created)
+class EmployeeNotFoundError(Exception):
+    def __init__(self, employee_id: int) -> None:
+        super().__init__(f"Employee {employee_id} does not exist")
 
 
-def remove_skill(session: Session, employee_id: int, skill_id: int) -> None:
-    session.execute(
-        delete(EmployeeSkill).where(
-            EmployeeSkill.employee_id == employee_id, EmployeeSkill.skill_id == skill_id
+class EmployeeChangedError(Exception):
+    def __init__(self) -> None:
+        super().__init__(
+            "The employee has changed since it was loaded; load it again and redo the changes"
         )
-    )
-    session.commit()
 
 
 class UnknownSkillsError(Exception):
@@ -113,9 +98,31 @@ class UnknownSkillsError(Exception):
         self.skill_ids = skill_ids
 
 
-def replace_skills(session: Session, employee_id: int, skills: list[SkillLevelWrite]) -> None:
-    """Makes `skills` the employee's complete set of skills, in one transaction. Only
+def etag(employee: Employee) -> str:
+    """The version of the employee as the API shows it: whatever changes what it shows
+    changes the version, so a client can tell that what it loaded is out of date."""
+    shown = EmployeeRead.model_validate(employee).model_dump_json()
+    return f'"{hashlib.sha256(shown.encode()).hexdigest()[:32]}"'
+
+
+def replace_skills(
+    session: Session, employee_id: int, skills: list[SkillLevelWrite], if_match: str
+) -> Employee:
+    """Makes `skills` the employee's complete set of skills, in one transaction, if the
+    employee is still at the version `if_match` names, and returns it as stored. Only
     catalogue skills can be assigned; this never creates one."""
+    # Locked until the commit, so that of two concurrent requests from the same version,
+    # the second one waits, then sees the first one's change and is refused.
+    employee = session.scalar(
+        select(Employee)
+        .where(Employee.id == employee_id)
+        .options(selectinload(Employee.skills))
+        .with_for_update(of=Employee)
+    )
+    if employee is None:
+        raise EmployeeNotFoundError(employee_id)
+    if etag(employee) != if_match:
+        raise EmployeeChangedError()
     ids = [skill.skill_id for skill in skills]
     known = set(session.scalars(select(Skill.id).where(Skill.id.in_(ids))))
     if unknown := sorted(set(ids) - known):
@@ -138,3 +145,9 @@ def replace_skills(session: Session, employee_id: int, skills: list[SkillLevelWr
             )
         )
     session.commit()
+    # The statements above bypassed the session, which still holds the skills as loaded.
+    stored = session.get(
+        Employee, employee_id, options=[selectinload(Employee.skills)], populate_existing=True
+    )
+    assert stored is not None
+    return stored

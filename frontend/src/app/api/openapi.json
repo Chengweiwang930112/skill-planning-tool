@@ -184,6 +184,7 @@
           "employees"
         ],
         "summary": "Get an employee",
+        "description": "With its version in the `ETag` header, which changing its skills requires.",
         "operationId": "get_employee_api_v1_employees__employee_id__get",
         "parameters": [
           {
@@ -236,7 +237,7 @@
           "employees"
         ],
         "summary": "Replace all skills of an employee",
-        "description": "Sets the employee's complete set of skills in one transaction: listed skills are\nassigned at their level, all others are removed. Skills come from the catalogue\n(`GET /skills`); unknown ids are rejected. Either all changes apply or none.",
+        "description": "Sets the employee's complete set of skills in one transaction: listed skills are\nassigned at their level, all others are removed. Skills come from the catalogue\n(`GET /skills`); unknown ids are rejected. Either all changes apply or none.\n\nOnly for the version of the employee that was loaded (`If-Match`), so that changes\nsomeone else saved in the meantime are not overwritten unseen; the response has the\nnew version.",
         "operationId": "replace_skills_api_v1_employees__employee_id__skills_put",
         "parameters": [
           {
@@ -247,6 +248,24 @@
               "type": "integer",
               "title": "Employee Id"
             }
+          },
+          {
+            "name": "if-match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The `ETag` of the employee as it was loaded.",
+              "title": "If-Match"
+            },
+            "description": "The `ETag` of the employee as it was loaded."
           }
         ],
         "requestBody": {
@@ -289,61 +308,9 @@
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "/api/v1/employees/{employee_id}/skills/{skill_id}": {
-      "put": {
-        "tags": [
-          "employees"
-        ],
-        "summary": "Assign a skill or change its level",
-        "description": "Idempotent: 201 when the employee did not have the skill yet, 200 otherwise.",
-        "operationId": "assign_skill_api_v1_employees__employee_id__skills__skill_id__put",
-        "parameters": [
-          {
-            "name": "employee_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Employee Id"
-            }
           },
-          {
-            "name": "skill_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Skill Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SkillAssignmentWrite"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SkillAssignmentRead"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Invalid parameters",
+          "412": {
+            "description": "The employee has changed since it was loaded",
             "content": {
               "application/json": {
                 "schema": {
@@ -352,71 +319,8 @@
               }
             }
           },
-          "200": {
-            "description": "Level changed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SkillAssignmentRead"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Employee or skill not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "employees"
-        ],
-        "summary": "Remove a skill from an employee",
-        "description": "Idempotent: removing a skill the employee does not have is not an error.",
-        "operationId": "remove_skill_api_v1_employees__employee_id__skills__skill_id__delete",
-        "parameters": [
-          {
-            "name": "employee_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Employee Id"
-            }
-          },
-          {
-            "name": "skill_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Skill Id"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Invalid parameters",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetail"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Employee or skill not found",
+          "428": {
+            "description": "If-Match is missing",
             "content": {
               "application/json": {
                 "schema": {
@@ -1887,28 +1791,6 @@
           "level"
         ],
         "title": "SkillAssignmentRead"
-      },
-      "SkillAssignmentWrite": {
-        "properties": {
-          "level": {
-            "type": "string",
-            "enum": [
-              "beginner",
-              "intermediate",
-              "advanced",
-              "expert"
-            ],
-            "description": "Ordered from lowest to highest.",
-            "examples": [
-              "advanced"
-            ]
-          }
-        },
-        "type": "object",
-        "required": [
-          "level"
-        ],
-        "title": "SkillAssignmentWrite"
       },
       "SkillLevelWrite": {
         "properties": {

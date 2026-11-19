@@ -36,9 +36,11 @@ def test_skills_assigned_from_the_catalogue_are_found_by_the_skill_search(
     [k8s] = client.get("/api/v1/skills", params={"q": "kubernetes"}).json()["items"]
 
     # When
+    loaded = client.get(f"/api/v1/employees/{anna['id']}")
     saved = client.put(
         f"/api/v1/employees/{anna['id']}/skills",
         json={"skills": [{"skill_id": k8s["id"], "level": "expert"}]},
+        headers={"If-Match": loaded.headers["etag"]},
     )
 
     # Then

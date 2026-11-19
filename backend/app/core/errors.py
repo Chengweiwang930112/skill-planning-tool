@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Mapping
 from http import HTTPStatus
 from typing import Any
@@ -9,6 +10,8 @@ from pydantic import BaseModel, Field
 from starlette.exceptions import HTTPException
 
 PROBLEM_MEDIA_TYPE = "application/problem+json"
+
+logger = logging.getLogger(__name__)
 
 
 class InvalidParam(BaseModel):
@@ -63,6 +66,18 @@ async def _validation_error(_: Request, exc: Exception) -> JSONResponse:
     )
 
 
+async def _unexpected_error(request: Request, exc: Exception) -> JSONResponse:
+    # Outside the request's middleware, so its id comes from the request, not the context.
+    current = getattr(request.state, "request_id", None)
+    logger.error("Unexpected error", exc_info=exc, extra={"request_id": current})
+    return problem(
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Something went wrong on our side; the request id identifies it in the logs",
+        headers={"X-Request-ID": current} if current else None,
+    )
+
+
 def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(HTTPException, _http_exception)
     app.add_exception_handler(RequestValidationError, _validation_error)
+    app.add_exception_handler(Exception, _unexpected_error)

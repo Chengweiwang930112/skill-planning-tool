@@ -93,7 +93,17 @@
   </div>
 
   <footer class="actions p-6">
-    @if (saveError(); as message) {
+    @if (outdated()) {
+      <si-inline-notification
+        class="d-block mb-4"
+        severity="warning"
+        heading="Someone else changed these skills in the meantime."
+        message="Your changes were not saved. Load the latest version, then make them again."
+      />
+      <button type="button" class="btn btn-secondary mb-4" (click)="loadLatest()">
+        Load the latest version
+      </button>
+    } @else if (saveError(); as message) {
       <si-inline-notification
         class="d-block mb-4"
         severity="danger"

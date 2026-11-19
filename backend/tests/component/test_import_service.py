@@ -180,3 +180,17 @@ def test_gives_employees_their_department_and_location_from_the_file(
     departments, locations = (list(call.args[2]) for call in ids_by_key.call_args_list)
     # Jonas's row fails for his email, so his department and location are not added.
     assert (departments, locations) == (["Mobility"], ["Munich"])
+
+
+def test_logs_what_an_import_did(session: MagicMock, caplog: pytest.LogCaptureFixture) -> None:
+    # Given
+    given_the_database_has(session)
+    caplog.set_level("INFO", logger="app")
+
+    # When
+    import_employees(session, "team.csv", f"{HEADER}\nE-1,Anna,Schmidt,a@example.com,\n".encode())
+
+    # Then
+    [entry] = [r for r in caplog.records if r.name == "app.services.import_service"]
+    assert entry.getMessage() == "Imported team.csv: succeeded"
+    assert (entry.file, entry.rows_created, entry.rows_failed) == ("team.csv", 1, 0)  # type: ignore[attr-defined]

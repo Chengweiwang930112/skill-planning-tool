@@ -1,4 +1,5 @@
 import hashlib
+import logging
 from collections.abc import Sequence
 from dataclasses import asdict
 
@@ -13,6 +14,8 @@ from app.services.lookups_service import ids_by_key
 # Imports are serialised: two concurrent uploads creating the same employee number
 # would otherwise race between the existence check and the insert.
 IMPORT_LOCK_KEY = 4_201_001
+
+logger = logging.getLogger(__name__)
 
 
 def import_employees(session: Session, filename: str, content: bytes) -> EmployeeImport:
@@ -46,6 +49,20 @@ def import_employees(session: Session, filename: str, content: bytes) -> Employe
     )
     session.add(record)
     session.commit()
+    logger.info(
+        "Imported %s: %s",
+        filename,
+        record.status,
+        extra={
+            "import_id": record.id,
+            "file": filename,
+            "import_status": record.status,
+            "rows_created": record.rows_created,
+            "rows_updated": record.rows_updated,
+            "rows_unchanged": record.rows_unchanged,
+            "rows_failed": record.rows_failed,
+        },
+    )
     return record
 
 

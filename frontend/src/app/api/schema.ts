@@ -31,7 +31,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get an employee */
+        /**
+         * Get an employee
+         * @description With its version in the `ETag` header, which changing its skills requires.
+         */
         get: operations["get_employee_api_v1_employees__employee_id__get"];
         put?: never;
         post?: never;
@@ -54,34 +57,14 @@ export interface paths {
          * @description Sets the employee's complete set of skills in one transaction: listed skills are
          *     assigned at their level, all others are removed. Skills come from the catalogue
          *     (`GET /skills`); unknown ids are rejected. Either all changes apply or none.
+         *
+         *     Only for the version of the employee that was loaded (`If-Match`), so that changes
+         *     someone else saved in the meantime are not overwritten unseen; the response has the
+         *     new version.
          */
         put: operations["replace_skills_api_v1_employees__employee_id__skills_put"];
         post?: never;
         delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/employees/{employee_id}/skills/{skill_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Assign a skill or change its level
-         * @description Idempotent: 201 when the employee did not have the skill yet, 200 otherwise.
-         */
-        put: operations["assign_skill_api_v1_employees__employee_id__skills__skill_id__put"];
-        post?: never;
-        /**
-         * Remove a skill from an employee
-         * @description Idempotent: removing a skill the employee does not have is not an error.
-         */
-        delete: operations["remove_skill_api_v1_employees__employee_id__skills__skill_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -675,15 +658,6 @@ export interface components {
              */
             level: "beginner" | "intermediate" | "advanced" | "expert";
         };
-        /** SkillAssignmentWrite */
-        SkillAssignmentWrite: {
-            /**
-             * @description Ordered from lowest to highest.
-             * @example advanced
-             * @enum {string}
-             */
-            level: "beginner" | "intermediate" | "advanced" | "expert";
-        };
         /** SkillLevelWrite */
         SkillLevelWrite: {
             /**
@@ -836,7 +810,10 @@ export interface operations {
     replace_skills_api_v1_employees__employee_id__skills_put: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description The `ETag` of the employee as it was loaded. */
+                "if-match"?: string | null;
+            };
             path: {
                 employee_id: number;
             };
@@ -866,53 +843,8 @@ export interface operations {
                     "application/json": components["schemas"]["ProblemDetail"];
                 };
             };
-            /** @description Invalid parameters */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProblemDetail"];
-                };
-            };
-        };
-    };
-    assign_skill_api_v1_employees__employee_id__skills__skill_id__put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                employee_id: number;
-                skill_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SkillAssignmentWrite"];
-            };
-        };
-        responses: {
-            /** @description Level changed */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SkillAssignmentRead"];
-                };
-            };
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SkillAssignmentRead"];
-                };
-            };
-            /** @description Employee or skill not found */
-            404: {
+            /** @description The employee has changed since it was loaded */
+            412: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -929,38 +861,8 @@ export interface operations {
                     "application/json": components["schemas"]["ProblemDetail"];
                 };
             };
-        };
-    };
-    remove_skill_api_v1_employees__employee_id__skills__skill_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                employee_id: number;
-                skill_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Employee or skill not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProblemDetail"];
-                };
-            };
-            /** @description Invalid parameters */
-            422: {
+            /** @description If-Match is missing */
+            428: {
                 headers: {
                     [name: string]: unknown;
                 };

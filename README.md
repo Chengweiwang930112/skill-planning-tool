@@ -4,12 +4,31 @@ An internal tool for team leads: import employees from a CSV, keep track of
 their skills and proficiency levels, and answer questions such as *"who knows
 Kubernetes at an advanced level?"* without asking around in chat.
 
-> **Status: complete (M11).** All four features — employee import, employee
+> **Status: complete.** All four features — employee import, employee
 > overview, skill assignment and skill search — work in the backend and the
-> frontend, ship as one container image and pass a CI/CD pipeline.
-> Design decisions are recorded in [docs/adr](docs/adr/README.md). Each
-> milestone of the [Roadmap](#roadmap) is a self-contained commit with its own
-> tests.
+> frontend, ship as one container image and pass a CI/CD pipeline. Design
+> decisions are recorded in [docs/adr](docs/adr/README.md).
+
+## Try it
+
+On any system with Docker — nothing else to install:
+
+```bash
+docker compose --profile app up --build --detach --wait
+```
+
+Then open <http://localhost:8080> (Swagger UI at <http://localhost:8080/docs>):
+
+1. **Manage → Import employees**: upload `samples/employees.csv`.
+2. **Manage → Skill catalogue**: add a few skills, e.g. Kubernetes and Python.
+3. Click an employee, give them skills with a level, and **Save**.
+4. On the home page, search for *Kubernetes, advanced or higher*.
+
+With [uv](https://docs.astral.sh/uv/) installed, demo data saves steps 1–3:
+`cd backend && uv run python -m scripts.add_skills ../samples/skills.txt --url http://127.0.0.1:8080 && uv run python -m scripts.seed`.
+`docker compose --profile app down` stops everything; add `--volumes` to
+delete the data too. On Windows, `make setup` does all of this, see
+[Quick start](#quick-start).
 
 ## Tech stack
 
@@ -57,6 +76,14 @@ HTTP (status codes, problem details), the services in `app/services`
 (`*_service.py`) hold the queries and rules, `app/models.py` the schema; the Pydantic models in `app/schemas.py` are the API contract, and the
 frontend's types are generated from it. The reasoning behind the main choices
 is in the [architecture decision records](docs/adr/README.md).
+
+**Logs** are JSON, one object per line on stdout, as CloudWatch Logs reads them
+from an ECS task. Every request gets an id — the caller's `X-Request-ID` if it
+is safe, a new one otherwise — which its log lines and its response carry, and
+one line with method, path, status and duration (passing health probes
+excepted; uvicorn's own access log is off). An unexpected error is logged with
+its traceback and answered with a `500` problem that has the request id, and
+nothing of the error. Imports log what they did.
 
 ## User interface
 
@@ -230,7 +257,8 @@ How the image is deployed to ECS is described in
 Skills come from one managed list, so the same skill is never stored under two
 spellings. The catalogue page (`/skills`) adds, renames and removes skills.
 Everywhere else, skills can only be chosen from the catalogue: the skill inputs
-on the employee panel and the search page accept a suggestion, never free text.
+on the employee panel and the search on the home page accept a suggestion,
+never free text.
 
 - **Names are unique ignoring case, spaces and punctuation**, so `Node.js`,
   `nodejs` and `Node JS` are one skill. `+` and `#` count as letters (`plus`,
@@ -254,6 +282,15 @@ on the employee panel and the search page accept a suggestion, never free text.
 | `PATCH /api/v1/skills/{id}`         | rename; `409` on a clash                                      |
 | `DELETE /api/v1/skills/{id}`        | remove; `409` while employees have it                         |
 | `PUT /api/v1/employees/{id}/skills` | set an employee's skills by `skill_id`; unknown ids are `422` |
+
+**Two people editing the same employee** cannot overwrite each other unseen
+([ADR 0012](docs/adr/0012-concurrent-skill-edits.md)). `GET /employees/{id}`
+returns the employee's version as an `ETag`, and saving its skills needs it in
+`If-Match`: a save over an older version is refused with `412`, one without a
+version with `428`. The employee's row is locked while the version is checked
+and the skills are written, so of two saves at the same moment only the first
+succeeds. The panel then says that someone else changed the skills and offers
+the latest version.
 
 ## Departments and locations
 
@@ -330,6 +367,7 @@ The files in `samples/` cover these cases:
 | `employees.csv`              | a clean file; against the demo data: 2 created, 2 updated, 8 unchanged |
 | `employees-excel-de.csv`     | a German Excel export: Windows-1252, `;`, CRLF, `DD.MM.YYYY` |
 | `employees-with-errors.csv`  | one example of each row error next to valid rows             |
+| `employees-fail.csv`         | only invalid rows, so the import is recorded as failed       |
 | `employees-20000.csv`        | 20,000 fictional employees, for trying the import at volume  |
 | `skills.txt`                 | 44 skills for a starter catalogue, added by `make setup`     |
 
@@ -446,61 +484,16 @@ Swagger UI; health checks are `/healthz` (liveness) and `/readyz` (database
 reachable); each container runs one server process, so scale by running more
 tasks.
 
-## Roadmap
+## History
 
-| Milestone | Scope                                                               |
-| --------- | ------------------------------------------------------------------- |
-| M0        | Scaffolding, tooling and quality gates                              |
-| M1        | Domain model, PostgreSQL, Alembic migrations                        |
-| M2        | Employee read API (pagination, sorting, filtering)                  |
-| M3        | CSV import: parsing, validation, idempotent upsert, import report   |
-| M4        | Skill catalogue and skill assignment                                |
-| M5        | Skill search with "at least this level" semantics                   |
-| M6        | Frontend foundation and employee overview (details below)           |
-| M7        | Employee import page                                                |
-| M8        | Skill assignment                                                    |
-| M9        | Skill search page                                                   |
-| M10       | Container images and Docker Compose                                 |
-| M11       | CI/CD pipeline, architecture decision records, documentation        |
-
-All milestones are done.
-
-### Frontend milestones
-
-**M6 — Foundation and employee overview**
-- Application shell: Element application header with navigation, routing with
-  lazily loaded pages.
-- API access: types generated from the backend's OpenAPI schema, `/api` proxied
-  to the backend by the dev server, errors shown from the problem details.
-- Employee overview: table of employees with their skills as level-coloured
-  badges, text search, sortable columns and pagination, all kept in the URL so
-  a view can be bookmarked and the back button works.
-- Loading, empty and error states.
-- Removes the M0 placeholder page, including the Element button showcase that
-  checked the design system setup.
-
-**M7 — Employee import**
-- Upload page with drag and drop (Element file uploader) for CSV files.
-- Import report: succeeded and failed counts, created / updated / unchanged
-  breakdown and the row errors as a table with line, column and reason.
-- Import history from `GET /imports`, each entry opening its report.
-- The employee overview shows newly imported employees without a reload.
-
-**M8 — Skill assignment**
-- Employee detail in a side panel, opened from the overview.
-- Add a skill chosen from the catalogue's suggestions (free text is not
-  accepted, see [Skill catalogue](#skill-catalogue)); choose or change its
-  level; remove it.
-- Edits are collected in a draft and saved together with **Save**, in one
-  request (`PUT /employees/{id}/skills`) that applies all of them or none;
-  **Exit** leaves without saving.
-
-**M9 — Skill search**
-- Search page answering "who knows Kubernetes at an advanced level?": one or
-  more skill + minimum level criteria, picked from the catalogue.
-- Results table highlighting the matched skills, combined with the text search
-  and paging of the overview.
-- Criteria kept in the URL, so a search can be shared as a link.
+The project was built in milestones, each a commit of its own with its tests
+(`git log --reverse`): scaffolding and quality gates; the domain model and
+migrations; the employee API; the CSV import; the skill catalogue and
+assignment; the skill search; the frontend's overview, import, assignment and
+search; the container image; and the CI/CD pipeline with the ADRs. Later
+commits refined them — a synchronous backend, test layers, the redesigned home
+page, department and location filters, saving skills only over the version
+they were edited from — each with its reasons in the ADRs.
 
 ## Non-goals
 

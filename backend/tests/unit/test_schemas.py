@@ -12,8 +12,8 @@ from app.schemas import (
     ImportSummary,
     PageQuery,
     SkillAssignmentRead,
-    SkillAssignmentWrite,
     SkillCriterion,
+    SkillLevelWrite,
     SkillRead,
     SkillWrite,
     parse_skill_criterion,
@@ -32,7 +32,7 @@ def reasons(error: ValidationError) -> list[str]:
 )
 def test_reads_a_level_by_its_name_ignoring_case(value: object, level: ProficiencyLevel) -> None:
     # When
-    write = SkillAssignmentWrite.model_validate({"level": value})
+    write = SkillLevelWrite.model_validate({"skill_id": 7, "level": value})
 
     # Then
     assert write.level is level
@@ -42,7 +42,7 @@ def test_reads_a_level_by_its_name_ignoring_case(value: object, level: Proficien
 def test_accepts_only_the_names_of_the_levels(value: object) -> None:
     # When / Then
     with pytest.raises(ValidationError) as error:
-        SkillAssignmentWrite.model_validate({"level": value})
+        SkillLevelWrite.model_validate({"skill_id": 7, "level": value})
     assert reasons(error.value) == [
         "Value error, must be one of beginner, intermediate, advanced, expert"
     ]

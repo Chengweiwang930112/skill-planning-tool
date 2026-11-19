@@ -18,3 +18,4 @@ supersedes the old one.
 | [0009](0009-synchronous-backend.md)     | A synchronous backend (supersedes part of 0001)           |
 | [0010](0010-test-layers.md)             | Unit, component and integration tests                     |
 | [0011](0011-departments-and-locations.md) | Departments and locations as records of their own       |
+| [0012](0012-concurrent-skill-edits.md)  | Saving skills only over the version they were edited from |

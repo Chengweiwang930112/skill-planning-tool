@@ -35,4 +35,5 @@ ENV PATH=/app/.venv/bin:$PATH \
 USER app
 EXPOSE 8000
 # One process per container: scale by running more containers (ECS tasks), not workers.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
+# The application logs every request itself, with its request id, as JSON.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*", "--no-access-log"]

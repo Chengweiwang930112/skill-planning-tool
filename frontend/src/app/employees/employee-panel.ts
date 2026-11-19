@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { HttpClient, httpResource } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, httpResource } from '@angular/common/http';
 import {
   Component,
   computed,
@@ -39,7 +39,8 @@ function sameSkills(a: DraftSkill[], b: DraftSkill[]): boolean {
   return key(a) === key(b);
 }
 
-/** Skill edits change a draft; Save sends the whole draft in one request. */
+/** Skill edits change a draft; Save sends the whole draft in one request, for the version
+ * of the employee it was made from, so that it cannot overwrite changes saved since. */
 @Component({
   selector: 'app-employee-panel',
   imports: [
@@ -65,6 +66,8 @@ export class EmployeePanel {
   protected readonly employee = httpResource<Employee>(
     () => `/api/v1/employees/${this.employeeId()}`,
   );
+  /** The version the draft is based on: as loaded, then as last saved. */
+  private readonly version = linkedSignal(() => this.employee.headers()?.get('ETag') ?? '');
   protected readonly loadError = computed(() => {
     const error = this.employee.error();
     return error ? problemMessage(error) : undefined;
@@ -80,6 +83,8 @@ export class EmployeePanel {
   protected readonly saving = signal(false);
   protected readonly saved = signal(false);
   protected readonly saveError = signal<string | undefined>(undefined);
+  /** Someone else saved changes since the employee was loaded. */
+  protected readonly outdated = signal(false);
 
   protected readonly picker = viewChild(SkillPicker);
   protected readonly draftNames = computed(() => this.draft().map((s) => s.name));
@@ -120,18 +125,29 @@ export class EmployeePanel {
     this.saving.set(true);
     this.saveError.set(undefined);
     try {
-      const employee = await firstValueFrom(
-        this.http.put<Employee>(`/api/v1/employees/${this.employeeId()}/skills`, {
-          skills: this.draft().map(({ id, level }) => ({ skill_id: id, level })),
-        }),
+      const response = await firstValueFrom(
+        this.http.put<Employee>(
+          `/api/v1/employees/${this.employeeId()}/skills`,
+          { skills: this.draft().map(({ id, level }) => ({ skill_id: id, level })) },
+          { headers: { 'If-Match': this.version() }, observe: 'response' },
+        ),
       );
-      this.employee.value.set(employee);
+      this.employee.value.set(response.body!);
+      this.version.set(response.headers.get('ETag') ?? '');
       this.saved.set(true);
     } catch (error) {
+      this.outdated.set(error instanceof HttpErrorResponse && error.status === 412);
       this.saveError.set(problemMessage(error));
     } finally {
       this.saving.set(false);
     }
+  }
+
+  /** Drops the draft for the employee as stored now, with the changes saved since. */
+  protected loadLatest(): void {
+    this.outdated.set(false);
+    this.saveError.set(undefined);
+    this.employee.reload();
   }
 
   private edit(change: (skills: DraftSkill[]) => DraftSkill[]): void {

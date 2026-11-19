@@ -6,7 +6,7 @@ SHELL := cmd.exe
 export TEST_DB_PORT ?= 5434
 
 # 127.0.0.1 rather than localhost, which Windows may resolve to ::1 first.
-BACKEND := uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
+BACKEND := uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-access-log
 FRONTEND := npm start -- --host 127.0.0.1 --port 4200
 # By port, so that servers started by hand are stopped too; /T includes child processes.
 STOP_SERVERS := powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 8000,4200 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { taskkill /F /T /PID $$_.OwningProcess }; exit 0"

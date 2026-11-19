@@ -5,11 +5,12 @@ import pytest
 from app.models import Employee, ProficiencyLevel
 from app.schemas import EmployeeQuery, SkillLevelWrite
 from app.services.employees_service import (
+    EmployeeChangedError,
+    EmployeeNotFoundError,
     UnknownSkillsError,
-    assign_skill,
+    etag,
     get_employee,
     list_employees,
-    remove_skill,
     replace_skills,
 )
 from tests.component.conftest import sql
@@ -109,41 +110,19 @@ def test_gets_an_employee_with_their_skills(session: MagicMock) -> None:
     assert session.get.call_args.kwargs["options"]
 
 
-@pytest.mark.parametrize("inserted", [True, False], ids=["new", "changed"])
-def test_assigning_a_skill_is_one_upsert_that_tells_new_from_changed(
-    session: MagicMock, inserted: bool
-) -> None:
-    # Given
-    session.scalar.return_value = inserted
-
-    # When
-    created = assign_skill(session, 1, 7, EXPERT)
-
-    # Then
-    assert created is inserted
-    statement = sql(session.scalar.call_args.args[0])
-    assert "ON CONFLICT (employee_id, skill_id) DO UPDATE SET level" in statement
-    assert "RETURNING xmax = 0" in statement
-    session.commit.assert_called_once()
+def loaded(session: MagicMock) -> str:
+    """The employee as the request finds it, locked; returns its version."""
+    employee = make_employee(id=1)
+    session.scalar.return_value = employee
+    session.get.return_value = make_employee(id=1)
+    return etag(employee)
 
 
-def test_removing_a_skill_deletes_only_that_assignment(session: MagicMock) -> None:
-    # When
-    remove_skill(session, 1, 7)
-
-    # Then
-    statement = sql(session.execute.call_args.args[0])
-    assert statement == (
-        "DELETE FROM employee_skill "
-        "WHERE employee_skill.employee_id = 1 AND employee_skill.skill_id = 7"
-    )
-    session.commit.assert_called_once()
-
-
-def test_replacing_skills_removes_the_others_and_upserts_only_changed_levels(
+def test_replacing_skills_locks_the_employee_then_upserts_only_changed_levels(
     session: MagicMock,
 ) -> None:
     # Given
+    version = loaded(session)
     session.scalars.return_value = [7, 8]
     skills = [
         SkillLevelWrite(skill_id=7, level=ADVANCED),
@@ -151,23 +130,27 @@ def test_replacing_skills_removes_the_others_and_upserts_only_changed_levels(
     ]
 
     # When
-    replace_skills(session, 1, skills)
+    stored = replace_skills(session, 1, skills, version)
 
     # Then
+    assert sql(session.scalar.call_args.args[0]).endswith("FOR UPDATE OF employee")
     delete, upsert = (sql(call.args[0]) for call in session.execute.call_args_list)
     assert "employee_skill.employee_id = 1 AND (employee_skill.skill_id NOT IN (7, 8))" in delete
     assert "VALUES (1, 7, 3), (1, 8, 4)" in upsert
     assert "DO UPDATE SET level = excluded.level, updated_at = now()" in upsert
     assert "WHERE employee_skill.level != excluded.level" in upsert
     session.commit.assert_called_once()
+    assert stored is session.get.return_value
+    assert session.get.call_args.kwargs["populate_existing"] is True
 
 
 def test_replacing_with_no_skills_only_deletes(session: MagicMock) -> None:
     # Given
+    version = loaded(session)
     session.scalars.return_value = []
 
     # When
-    replace_skills(session, 1, [])
+    replace_skills(session, 1, [], version)
 
     # Then
     [delete] = session.execute.call_args_list
@@ -179,6 +162,7 @@ def test_refuses_skills_missing_from_the_catalogue_before_changing_anything(
     session: MagicMock,
 ) -> None:
     # Given
+    version = loaded(session)
     session.scalars.return_value = [7]
     skills = [
         SkillLevelWrite(skill_id=7, level=EXPERT),
@@ -187,6 +171,30 @@ def test_refuses_skills_missing_from_the_catalogue_before_changing_anything(
 
     # When / Then
     with pytest.raises(UnknownSkillsError, match="Unknown skills: 999"):
-        replace_skills(session, 1, skills)
+        replace_skills(session, 1, skills, version)
+    session.execute.assert_not_called()
+    session.commit.assert_not_called()
+
+
+def test_refuses_to_replace_the_skills_of_a_version_that_is_out_of_date(
+    session: MagicMock,
+) -> None:
+    # Given
+    loaded(session)
+
+    # When / Then
+    with pytest.raises(EmployeeChangedError, match="changed since it was loaded"):
+        replace_skills(session, 1, [], '"an-older-version"')
+    session.execute.assert_not_called()
+    session.commit.assert_not_called()
+
+
+def test_replacing_the_skills_of_an_unknown_employee_changes_nothing(session: MagicMock) -> None:
+    # Given
+    session.scalar.return_value = None
+
+    # When / Then
+    with pytest.raises(EmployeeNotFoundError, match="Employee 1 does not exist"):
+        replace_skills(session, 1, [], '"v1"')
     session.execute.assert_not_called()
     session.commit.assert_not_called()

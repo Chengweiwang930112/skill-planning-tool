@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from app.models import ProficiencyLevel, Skill
 from app.schemas import EmployeeQuery, SkillLevelWrite
-from app.services import employees_service, skills_service
+from app.services import employees_service
 from tests.component.conftest import MockService
 from tests.factories import make_employee
 
@@ -139,6 +139,7 @@ def test_gets_one_employee(
     # Then
     assert response.status_code == status.HTTP_200_OK
     assert response.json()["last_name"] == "Schmidt"
+    assert response.headers["etag"] == employees_service.etag(anna())
     get_employee.assert_called_once_with(session, 1)
 
 
@@ -162,66 +163,67 @@ def test_an_unknown_employee_is_a_404_problem(
     }
 
 
-def test_replaces_the_skills_and_answers_with_the_stored_ones(
+def put_skills(client: TestClient, skills: list[dict[str, object]], if_match: str = "") -> Any:
+    headers = {"If-Match": if_match} if if_match else {}
+    return client.put(f"{URL}/1/skills", json={"skills": skills}, headers=headers)
+
+
+def test_replaces_the_skills_of_the_loaded_version_and_answers_with_the_new_one(
     client: TestClient, session: MagicMock, mock_service: MockService
 ) -> None:
     # Given
-    go = Skill(id=7, name="Go")
-    mock_service(
-        employees_service,
-        "get_employee",
-        side_effect=[anna(), anna((go, ProficiencyLevel.ADVANCED))],
-    )
-    replace_skills = mock_service(employees_service, "replace_skills")
+    stored = anna((Skill(id=7, name="Go"), ProficiencyLevel.ADVANCED))
+    replace_skills = mock_service(employees_service, "replace_skills", return_value=stored)
 
     # When
-    response = client.put(
-        f"{URL}/1/skills", json={"skills": [{"skill_id": 7, "level": "advanced"}]}
-    )
+    response = put_skills(client, [{"skill_id": 7, "level": "advanced"}], if_match='"v1"')
 
     # Then
     assert response.status_code == status.HTTP_200_OK
     assert response.json()["skills"] == [{"skill": {"id": 7, "name": "Go"}, "level": "advanced"}]
+    assert response.headers["etag"] == employees_service.etag(stored)
     replace_skills.assert_called_once_with(
-        session, 1, [SkillLevelWrite(skill_id=7, level=ProficiencyLevel.ADVANCED)]
+        session, 1, [SkillLevelWrite(skill_id=7, level=ProficiencyLevel.ADVANCED)], '"v1"'
     )
 
 
-def test_replacing_skills_of_an_unknown_employee_is_a_404(
+def test_replacing_skills_without_a_version_is_a_428(
     client: TestClient, mock_service: MockService
 ) -> None:
     # Given
-    mock_service(employees_service, "get_employee", return_value=None)
     replace_skills = mock_service(employees_service, "replace_skills")
 
     # When
-    response = client.put(f"{URL}/999999/skills", json={"skills": []})
+    response = put_skills(client, [])
 
     # Then
-    assert response.status_code == status.HTTP_404_NOT_FOUND
-    assert response.json()["detail"] == "Employee 999999 does not exist"
+    assert response.status_code == status.HTTP_428_PRECONDITION_REQUIRED
+    assert "If-Match" in response.json()["detail"]
     replace_skills.assert_not_called()
 
 
-def test_skills_missing_from_the_catalogue_are_a_422(
-    client: TestClient, mock_service: MockService
+@pytest.mark.parametrize(
+    ("error", "code"),
+    [
+        (employees_service.EmployeeNotFoundError(1), status.HTTP_404_NOT_FOUND),
+        (employees_service.EmployeeChangedError(), status.HTTP_412_PRECONDITION_FAILED),
+        (employees_service.UnknownSkillsError([999999]), status.HTTP_422_UNPROCESSABLE_CONTENT),
+    ],
+    ids=["unknown-employee", "changed-since-loaded", "unknown-skill"],
+)
+def test_a_refused_replacement_is_a_problem_with_the_reason(
+    client: TestClient, mock_service: MockService, error: Exception, code: int
 ) -> None:
     # Given
-    mock_service(employees_service, "get_employee", return_value=anna())
-    mock_service(
-        employees_service,
-        "replace_skills",
-        side_effect=employees_service.UnknownSkillsError([999999]),
-    )
+    mock_service(employees_service, "replace_skills", side_effect=error)
 
     # When
-    response = client.put(
-        f"{URL}/1/skills", json={"skills": [{"skill_id": 999999, "level": "expert"}]}
-    )
+    response = put_skills(client, [{"skill_id": 999999, "level": "expert"}], if_match='"v1"')
 
     # Then
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
-    assert response.json()["detail"] == "Unknown skills: 999999"
+    assert response.status_code == code
+    assert response.json()["detail"] == str(error)
+    assert "etag" not in response.headers
 
 
 @pytest.mark.parametrize(
@@ -240,96 +242,12 @@ def test_rejects_an_invalid_skill_list_without_changing_anything(
     client: TestClient, mock_service: MockService, skills: list[dict[str, object]], reason: str
 ) -> None:
     # Given
-    get_employee = mock_service(employees_service, "get_employee")
     replace_skills = mock_service(employees_service, "replace_skills")
 
     # When
-    response = client.put(f"{URL}/1/skills", json={"skills": skills})
+    response = put_skills(client, skills, if_match='"v1"')
 
     # Then
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
     assert reason in response.json()["errors"][0]["reason"]
-    get_employee.assert_not_called()
     replace_skills.assert_not_called()
-
-
-@pytest.mark.parametrize(("created", "code"), [(True, 201), (False, 200)], ids=["new", "changed"])
-def test_assigning_a_skill_tells_new_from_changed(
-    client: TestClient, session: MagicMock, mock_service: MockService, created: bool, code: int
-) -> None:
-    # Given
-    mock_service(employees_service, "get_employee", return_value=anna())
-    mock_service(skills_service, "get_skill", return_value=Skill(id=7, name="Go"))
-    assign_skill = mock_service(employees_service, "assign_skill", return_value=created)
-
-    # When
-    response = client.put(f"{URL}/1/skills/7", json={"level": "expert"})
-
-    # Then
-    assert response.status_code == code
-    assert response.json() == {"skill": {"id": 7, "name": "Go"}, "level": "expert"}
-    assign_skill.assert_called_once_with(session, 1, 7, ProficiencyLevel.EXPERT)
-
-
-def test_removes_a_skill(client: TestClient, session: MagicMock, mock_service: MockService) -> None:
-    # Given
-    mock_service(employees_service, "get_employee", return_value=anna())
-    mock_service(skills_service, "get_skill", return_value=Skill(id=7, name="Go"))
-    remove_skill = mock_service(employees_service, "remove_skill")
-
-    # When
-    response = client.delete(f"{URL}/1/skills/7")
-
-    # Then
-    assert response.status_code == status.HTTP_204_NO_CONTENT
-    remove_skill.assert_called_once_with(session, 1, 7)
-
-
-@pytest.mark.parametrize("method", ["put", "delete"])
-@pytest.mark.parametrize(
-    ("employee_found", "skill_found", "detail"),
-    [(False, True, "Employee 1 does not exist"), (True, False, "Skill 7 does not exist")],
-    ids=["unknown-employee", "unknown-skill"],
-)
-def test_an_assignment_of_an_unknown_employee_or_skill_is_a_404(
-    client: TestClient,
-    mock_service: MockService,
-    method: str,
-    employee_found: bool,
-    skill_found: bool,
-    detail: str,
-) -> None:
-    # Given
-    mock_service(employees_service, "get_employee", return_value=anna() if employee_found else None)
-    mock_service(
-        skills_service, "get_skill", return_value=Skill(id=7, name="Go") if skill_found else None
-    )
-    assign_skill = mock_service(employees_service, "assign_skill")
-    remove_skill = mock_service(employees_service, "remove_skill")
-    body = {"level": "advanced"} if method == "put" else None
-
-    # When
-    response = client.request(method, f"{URL}/1/skills/7", json=body)
-
-    # Then
-    assert response.status_code == status.HTTP_404_NOT_FOUND
-    assert response.json()["detail"] == detail
-    assign_skill.assert_not_called()
-    remove_skill.assert_not_called()
-
-
-def test_openapi_documents_problem_details_instead_of_the_default_error(
-    client: TestClient,
-) -> None:
-    # When
-    schema = client.get("/openapi.json").json()
-
-    # Then
-    list_operation = schema["paths"][URL]["get"]
-    assert "HTTPValidationError" not in schema["components"]["schemas"]
-    assert list_operation["responses"]["422"]["content"]["application/json"]["schema"] == {
-        "$ref": "#/components/schemas/ProblemDetail"
-    }
-    assert {p["name"] for p in list_operation["parameters"]} == {
-        "q", "department", "location", "skill", "sort", "page", "page_size"
-    }  # fmt: skip
