@@ -251,3 +251,36 @@ def test_rejects_an_invalid_skill_list_without_changing_anything(
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
     assert reason in response.json()["errors"][0]["reason"]
     replace_skills.assert_not_called()
+
+
+def test_deletes_an_employee(
+    client: TestClient, session: MagicMock, mock_service: MockService
+) -> None:
+    # Given
+    delete_employee = mock_service(employees_service, "delete_employee")
+
+    # When
+    response = client.delete(f"{URL}/1")
+
+    # Then
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+    assert response.content == b""
+    delete_employee.assert_called_once_with(session, 1)
+
+
+def test_deleting_an_unknown_employee_is_a_404(
+    client: TestClient, mock_service: MockService
+) -> None:
+    # Given
+    mock_service(
+        employees_service,
+        "delete_employee",
+        side_effect=employees_service.EmployeeNotFoundError(999999),
+    )
+
+    # When
+    response = client.delete(f"{URL}/999999")
+
+    # Then
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.json()["detail"] == "Employee 999999 does not exist"

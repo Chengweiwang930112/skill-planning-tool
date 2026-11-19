@@ -45,6 +45,22 @@ def get_employee(session: SessionDep, employee_id: int, response: Response) -> E
     return EmployeeRead.model_validate(employee)
 
 
+@router.delete(
+    "/{employee_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete an employee",
+    responses={status.HTTP_404_NOT_FOUND: problem_response("Employee not found")},
+)
+def delete_employee(session: SessionDep, employee_id: int) -> None:
+    """Deletes the employee with their skills. Needs no version: if their skills are
+    being changed at the same moment, the deletion happens once that change is saved.
+    An import with the employee in it later adds them again."""
+    try:
+        employees_service.delete_employee(session, employee_id)
+    except employees_service.EmployeeNotFoundError as error:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(error)) from None
+
+
 @router.put(
     "/{employee_id}/skills",
     summary="Replace all skills of an employee",

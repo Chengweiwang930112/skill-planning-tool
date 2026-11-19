@@ -229,6 +229,50 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "employees"
+        ],
+        "summary": "Delete an employee",
+        "description": "Deletes the employee with their skills. Needs no version: if their skills are\nbeing changed at the same moment, the deletion happens once that change is saved.\nAn import with the employee in it later adds them again.",
+        "operationId": "delete_employee_api_v1_employees__employee_id__delete",
+        "parameters": [
+          {
+            "name": "employee_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Employee Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Employee not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/employees/{employee_id}/skills": {

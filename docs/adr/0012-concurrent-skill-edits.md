@@ -37,6 +37,9 @@ Go is gone. Nothing tells either of them.
   save of skills from before it. That is rare and costs one reload.
 - Any other client has to read the employee before changing its skills, which
   a client replacing the whole set should do anyway.
+- Deleting an employee is deliberately not bound to a version: a deletion is
+  meant to win. It takes the same row lock, so it waits for a save in progress
+  and deletes after it; a save after the deletion finds no employee.
 
 ## Alternatives considered
 

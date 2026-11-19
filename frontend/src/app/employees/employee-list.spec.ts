@@ -8,9 +8,11 @@ import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideRouter, Router, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
+import { SiActionDialogService } from '@siemens/element-ng/action-modal';
 import { SiPaginationComponent } from '@siemens/element-ng/pagination';
 import { SiSearchBarComponent } from '@siemens/element-ng/search-bar';
 import { SiSidePanelComponent } from '@siemens/element-ng/side-panel';
+import { of } from 'rxjs';
 import type { Employee, EmployeePage, SkillPage } from '../api/models';
 import { EmployeeList, PAGE_SIZE } from './employee-list';
 import { EmployeePanel } from './employee-panel';
@@ -38,10 +40,23 @@ function page(items: Employee[], total = items.length, current = 1): EmployeePag
 describe('EmployeeList', () => {
   let harness: RouterTestingHarness;
   let http: HttpTestingController;
+  let answer: 'delete' | 'cancel';
+  let dialogs: { message: string }[];
 
   beforeEach(async () => {
+    answer = 'delete';
+    dialogs = [];
     TestBed.configureTestingModule({
       providers: [
+        {
+          provide: SiActionDialogService,
+          useValue: {
+            showActionDialog: (dialog: { message: string }) => {
+              dialogs.push(dialog);
+              return of(answer);
+            },
+          },
+        },
         provideRouter(
           [{ path: 'employees', component: EmployeeList }],
           withComponentInputBinding(),
@@ -444,6 +459,99 @@ describe('EmployeeList', () => {
 
     // Then
     expect(view.textContent).toContain('Try other departments or locations.');
+  });
+
+  async function deleteAnna(view: HTMLElement): Promise<TestRequest> {
+    view.querySelector<HTMLButtonElement>('button[aria-label="Delete Anna Schmidt"]')!.click();
+    await settle();
+    return http.expectOne({ method: 'DELETE', url: '/api/v1/employees/1' });
+  }
+
+  it('deletes an employee after confirming and shows the list without them', async () => {
+    // Given
+    const view = await respond(await open('/employees'), page([anna]));
+
+    // When
+    const deletion = await deleteAnna(view);
+
+    // Then
+    expect(dialogs.map((d) => d.message)).toEqual([
+      'Delete Anna Schmidt (E-1001) and their skills? Importing them again adds them back, without skills.',
+    ]);
+
+    // When
+    deletion.flush(null, { status: 204, statusText: 'No Content' });
+    await settle();
+    await respond(await nextRequest(), page([]));
+
+    // Then
+    expect(view.textContent).toContain('No employees yet');
+  });
+
+  it('deletes nothing when the deletion is cancelled', async () => {
+    // Given
+    answer = 'cancel';
+    const view = await respond(await open('/employees'), page([anna]));
+
+    // When
+    view.querySelector<HTMLButtonElement>('button[aria-label="Delete Anna Schmidt"]')!.click();
+    await settle();
+
+    // Then
+    expect(dialogs).toHaveLength(1);
+    http.expectNone({ method: 'DELETE' });
+    expect(currentUrl()).toBe('/employees');
+  });
+
+  it('closes the panel of the employee it deleted', async () => {
+    // Given
+    const list = await open('/employees?employee=1');
+    (await panelRequest(1)).flush(anna);
+    list.flush(page([anna]));
+    await settle();
+    const view = harness.routeNativeElement as HTMLElement;
+
+    // When
+    (await deleteAnna(view)).flush(null, { status: 204, statusText: 'No Content' });
+    await settle();
+
+    // Then
+    expect(currentUrl()).toBe('/employees');
+    await respond(await nextRequest(), page([]));
+  });
+
+  it('counts an employee someone else deleted first as deleted', async () => {
+    // Given
+    const view = await respond(await open('/employees'), page([anna]));
+
+    // When
+    (await deleteAnna(view)).flush(
+      { title: 'Not Found', status: 404, detail: 'Employee 1 does not exist' },
+      { status: 404, statusText: 'Not Found' },
+    );
+    await settle();
+    await respond(await nextRequest(), page([]));
+
+    // Then
+    expect(view.textContent).not.toContain('could not be deleted');
+    expect(view.textContent).toContain('No employees yet');
+  });
+
+  it('says why an employee could not be deleted and keeps them in the list', async () => {
+    // Given
+    const view = await respond(await open('/employees'), page([anna]));
+
+    // When
+    (await deleteAnna(view)).flush(
+      { title: 'Internal Server Error', status: 500, detail: 'Something went wrong' },
+      { status: 500, statusText: 'Internal Server Error' },
+    );
+    await settle();
+
+    // Then
+    expect(view.textContent).toContain('The employee could not be deleted.');
+    expect(view.textContent).toContain('Anna Schmidt: Something went wrong');
+    expect(view.textContent).toContain('Schmidt, Anna');
   });
 
   function paginator(): SiPaginationComponent {

@@ -166,3 +166,23 @@ def test_replacing_the_skills_of_an_unknown_employee_is_a_404(client: TestClient
     # Then
     assert response.status_code == status.HTTP_404_NOT_FOUND
     assert response.json()["detail"] == "Employee 999999 does not exist"
+
+
+def test_deleting_an_employee_removes_their_skills_but_not_the_catalogues(
+    client: TestClient, session: Session
+) -> None:
+    # Given
+    go = Skill(name="Go")
+    anna, jonas = make_employee({go: EXPERT}), make_employee({go: BEGINNER})
+    persist(session, anna, jonas)
+
+    # When
+    deleted = client.delete(f"/api/v1/employees/{anna.id}")
+    again = client.delete(f"/api/v1/employees/{anna.id}")
+
+    # Then
+    assert (deleted.status_code, again.status_code) == (204, 404)
+    assert client.get(f"/api/v1/employees/{anna.id}").status_code == status.HTTP_404_NOT_FOUND
+    assert count(session, EmployeeSkill) == 1
+    [catalogue_go] = client.get("/api/v1/skills").json()["items"]
+    assert (catalogue_go["name"], catalogue_go["employee_count"]) == ("Go", 1)

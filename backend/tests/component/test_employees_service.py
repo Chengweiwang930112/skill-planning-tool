@@ -8,6 +8,7 @@ from app.services.employees_service import (
     EmployeeChangedError,
     EmployeeNotFoundError,
     UnknownSkillsError,
+    delete_employee,
     etag,
     get_employee,
     list_employees,
@@ -197,4 +198,33 @@ def test_replacing_the_skills_of_an_unknown_employee_changes_nothing(session: Ma
     with pytest.raises(EmployeeNotFoundError, match="Employee 1 does not exist"):
         replace_skills(session, 1, [], '"v1"')
     session.execute.assert_not_called()
+    session.commit.assert_not_called()
+
+
+def test_deletes_the_employee_in_one_statement_and_logs_who_it_was(
+    session: MagicMock, caplog: pytest.LogCaptureFixture
+) -> None:
+    # Given
+    session.scalar.return_value = "E-1001"
+    caplog.set_level("INFO", logger="app")
+
+    # When
+    delete_employee(session, 1)
+
+    # Then
+    assert sql(session.scalar.call_args.args[0]) == (
+        "DELETE FROM employee WHERE employee.id = 1 RETURNING employee.employee_number"
+    )
+    session.commit.assert_called_once()
+    [entry] = [r for r in caplog.records if r.name == "app.services.employees_service"]
+    assert entry.getMessage() == "Deleted employee E-1001"
+
+
+def test_deleting_an_unknown_employee_commits_nothing(session: MagicMock) -> None:
+    # Given
+    session.scalar.return_value = None
+
+    # When / Then
+    with pytest.raises(EmployeeNotFoundError, match="Employee 1 does not exist"):
+        delete_employee(session, 1)
     session.commit.assert_not_called()

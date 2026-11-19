@@ -1,4 +1,5 @@
 import hashlib
+import logging
 from collections.abc import Sequence
 
 from sqlalchemy import Select, delete, func, or_, select
@@ -14,6 +15,8 @@ from app.models import (
     name_key,
 )
 from app.schemas import EmployeeQuery, EmployeeRead, SkillLevelWrite
+
+logger = logging.getLogger(__name__)
 
 SORTABLE: dict[str, InstrumentedAttribute[object]] = {
     "last_name": Employee.last_name,
@@ -96,6 +99,23 @@ class UnknownSkillsError(Exception):
     def __init__(self, skill_ids: list[int]) -> None:
         super().__init__(f"Unknown skills: {', '.join(map(str, skill_ids))}")
         self.skill_ids = skill_ids
+
+
+def delete_employee(session: Session, employee_id: int) -> None:
+    """Deletes the employee and, by the database's cascade, their skills. Not bound to a
+    version: a change to their skills in progress holds the employee's row, so the
+    deletion waits for it to finish, then deletes anyway."""
+    number = session.scalar(
+        delete(Employee).where(Employee.id == employee_id).returning(Employee.employee_number)
+    )
+    if number is None:
+        raise EmployeeNotFoundError(employee_id)
+    session.commit()
+    logger.info(
+        "Deleted employee %s",
+        number,
+        extra={"employee_id": employee_id, "employee_number": number},
+    )
 
 
 def etag(employee: Employee) -> str:

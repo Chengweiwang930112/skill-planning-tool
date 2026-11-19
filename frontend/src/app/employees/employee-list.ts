@@ -1,6 +1,7 @@
-import { httpResource } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, httpResource } from '@angular/common/http';
 import { Component, computed, inject, input, numberAttribute, signal } from '@angular/core';
 import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
+import { SiActionDialogService } from '@siemens/element-ng/action-modal';
 import { SiBadgeComponent } from '@siemens/element-ng/badge';
 import { SiEmptyStateComponent } from '@siemens/element-ng/empty-state';
 import { SiInlineNotificationComponent } from '@siemens/element-ng/inline-notification';
@@ -8,6 +9,7 @@ import { SiLoadingSpinnerComponent } from '@siemens/element-ng/loading-spinner';
 import { SiPaginationComponent } from '@siemens/element-ng/pagination';
 import { SiSearchBarComponent } from '@siemens/element-ng/search-bar';
 import { SiSidePanelComponent, SiSidePanelContentComponent } from '@siemens/element-ng/side-panel';
+import { firstValueFrom } from 'rxjs';
 import type { Employee, EmployeePage, EmployeeSort, SkillAssignment } from '../api/models';
 import { problemMessage } from '../api/problem';
 import { matchesAny, parseCriterion } from '../shared/criteria';
@@ -54,6 +56,8 @@ export class EmployeeList {
 
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly http = inject(HttpClient);
+  private readonly dialogs = inject(SiActionDialogService);
 
   protected readonly pageSize = PAGE_SIZE;
   protected readonly columns: { label: string; sort?: SortField }[] = [
@@ -91,6 +95,8 @@ export class EmployeeList {
     const error = this.employees.error();
     return error ? problemMessage(error) : undefined;
   });
+
+  protected readonly deleteError = signal<string | undefined>(undefined);
 
   /** Employees whose skills do not fit on one line, and those shown in full. */
   protected readonly overflowing = signal<ReadonlySet<number>>(new Set());
@@ -140,6 +146,35 @@ export class EmployeeList {
 
   protected toggleSkills(id: number): void {
     this.expanded.update((ids) => toggled(ids, id, !ids.has(id)));
+  }
+
+  /** After confirming; an employee someone else deleted first counts as deleted. */
+  protected async remove(employee: Employee): Promise<void> {
+    const name = `${employee.first_name} ${employee.last_name}`;
+    const answer = await firstValueFrom(
+      this.dialogs.showActionDialog({
+        type: 'delete-confirm',
+        heading: 'Delete employee',
+        message: `Delete ${name} (${employee.employee_number}) and their skills? Importing them again adds them back, without skills.`,
+        deleteBtnName: 'Delete',
+      }),
+    );
+    if (answer !== 'delete') {
+      return;
+    }
+    this.deleteError.set(undefined);
+    try {
+      await firstValueFrom(this.http.delete(`/api/v1/employees/${employee.id}`));
+    } catch (error) {
+      if (!(error instanceof HttpErrorResponse && error.status === 404)) {
+        this.deleteError.set(`${name}: ${problemMessage(error)}`);
+        return;
+      }
+    }
+    if (this.employee() === employee.id) {
+      this.closePanel();
+    }
+    this.employees.reload();
   }
 
   protected closePanel(): void {

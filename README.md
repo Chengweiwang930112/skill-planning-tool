@@ -292,6 +292,14 @@ and the skills are written, so of two saves at the same moment only the first
 succeeds. The panel then says that someone else changed the skills and offers
 the latest version.
 
+**Deleting an employee** — the bin at the end of their row, after confirming —
+removes them with their skills (`DELETE /api/v1/employees/{id}`, `204`; `404`
+if they are gone already, which the list takes as done). It needs no version:
+a deletion is meant to win. If their skills are being saved at that moment,
+the deletion waits for the save to finish, then deletes; a save that comes
+after it finds no employee (`404`). An import with them in it adds them again,
+without skills. Each deletion is logged with the employee number.
+
 ## Departments and locations
 
 Departments and locations are records of their own, which employees refer to
@@ -505,5 +513,5 @@ Deliberately out of scope, and why:
   login of our own would demonstrate the wrong thing.
 - **Audit logging and soft deletes.** Valuable in a real HR-adjacent system,
   but they would dominate the code without adding to what this case study is
-  about.
+  about; a deletion is final, and only logged.
 - **Internationalisation.** The UI is English-only.

@@ -38,7 +38,13 @@ export interface paths {
         get: operations["get_employee_api_v1_employees__employee_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete an employee
+         * @description Deletes the employee with their skills. Needs no version: if their skills are
+         *     being changed at the same moment, the deletion happens once that change is saved.
+         *     An import with the employee in it later adds them again.
+         */
+        delete: operations["delete_employee_api_v1_employees__employee_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -786,6 +792,44 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["EmployeeRead"];
                 };
+            };
+            /** @description Employee not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Invalid parameters */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    delete_employee_api_v1_employees__employee_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                employee_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Employee not found */
             404: {

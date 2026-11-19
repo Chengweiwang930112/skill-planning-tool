@@ -11,6 +11,14 @@
       />
     </div>
 
+    @if (deleteError(); as message) {
+      <si-inline-notification
+        class="d-block mb-4"
+        severity="danger"
+        heading="The employee could not be deleted."
+        [message]="message"
+      />
+    }
     @if (error(); as message) {
       <si-inline-notification
         severity="danger"
@@ -66,6 +74,7 @@
                     <th scope="col">{{ column.label }}</th>
                   }
                 }
+                <th scope="col" class="actions"><span class="visually-hidden">Actions</span></th>
               </tr>
             </thead>
             <tbody>
@@ -134,6 +143,15 @@
                         </button>
                       }
                     </div>
+                  </td>
+                  <td class="text-end">
+                    <button
+                      type="button"
+                      class="btn btn-circle btn-sm btn-tertiary element-delete"
+                      title="Delete employee"
+                      [attr.aria-label]="'Delete ' + employee.first_name + ' ' + employee.last_name"
+                      (click)="remove(employee)"
+                    ></button>
                   </td>
                 </tr>
               }
