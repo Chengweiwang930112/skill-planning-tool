@@ -50,10 +50,22 @@
   .expanded & {
     max-block-size: none;
   }
+
+  // A badge that does not fit moves to the next line, which Show more reveals, rather
+  // than being cut short; only one wider than the whole column is shortened.
+  > si-badge {
+    flex-shrink: 0;
+    max-inline-size: 100%;
+  }
 }
 
+// A link-like button rather than another badge: no fill, no outline, with a chevron.
 .more {
   flex-shrink: 0;
+  white-space: nowrap;
+  // The height of a line of badges, so that it sits beside the first line.
+  min-block-size: 1.5rem;
+  padding-block: 0;
 }
 
 // A grown row reads from the top, next to the first line of skills, rather than centred.

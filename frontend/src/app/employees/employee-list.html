@@ -123,6 +123,7 @@
                           (click)="toggleSkills(employee.id)"
                         >
                           Show less
+                          <i class="icon element-up-2" aria-hidden="true"></i>
                         </button>
                       } @else if (overflowing().has(employee.id)) {
                         <button
@@ -130,7 +131,7 @@
                           class="btn btn-sm btn-tertiary more"
                           aria-expanded="false"
                           [attr.aria-label]="
-                            'Show all ' +
+                            'Show more: all ' +
                             employee.skills.length +
                             ' skills of ' +
                             employee.first_name +
@@ -139,7 +140,8 @@
                           "
                           (click)="toggleSkills(employee.id)"
                         >
-                          …
+                          Show more
+                          <i class="icon element-down-2" aria-hidden="true"></i>
                         </button>
                       }
                     </div>

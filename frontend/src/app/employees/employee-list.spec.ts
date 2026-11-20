@@ -400,8 +400,8 @@ describe('EmployeeList', () => {
     const more = view.querySelector<HTMLButtonElement>('.skills .more')!;
 
     // Then
-    expect(more.textContent?.trim()).toBe('…');
-    expect(more.getAttribute('aria-label')).toBe('Show all 2 skills of Anna Schmidt');
+    expect(more.textContent?.trim()).toBe('Show more');
+    expect(more.getAttribute('aria-label')).toBe('Show more: all 2 skills of Anna Schmidt');
     expect(view.querySelector('.skills')?.classList.contains('expanded')).toBe(false);
 
     // When
@@ -421,7 +421,7 @@ describe('EmployeeList', () => {
 
     // Then
     expect(row.classList.contains('expanded-row')).toBe(false);
-    expect(row.querySelector('.more')?.textContent?.trim()).toBe('…');
+    expect(row.querySelector('.more')?.textContent?.trim()).toBe('Show more');
   });
 
   it('offers nothing more when the skills fit on one line', async () => {
