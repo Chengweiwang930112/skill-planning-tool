@@ -1,4 +1,4 @@
-import { provideHttpClient } from '@angular/common/http';
+import { HttpEventType, provideHttpClient } from '@angular/common/http';
 import {
   HttpTestingController,
   provideHttpClientTesting,
@@ -74,6 +74,16 @@ describe('ImportPage', () => {
     expect(view().querySelector('tbody a')?.getAttribute('href')).toBe('/imports/3');
   });
 
+  function progress(): { heading: string; shown: string } | undefined {
+    const bar = view().querySelector('si-progressbar');
+    if (!bar) {
+      return undefined;
+    }
+    const text = (bar.textContent ?? '').replace(/\s+/g, ' ').trim();
+    const shown = text.match(/\d+ %$/)?.[0] ?? '';
+    return { heading: text.slice(0, text.length - shown.length).trim(), shown };
+  }
+
   it('uploads a dropped file, shows the report and refreshes the history', async () => {
     // Given
     (await historyRequest()).flush(history([]));
@@ -85,10 +95,25 @@ describe('ImportPage', () => {
     await settle();
 
     // Then
-    expect(view().textContent).toContain('Importing employees.csv…');
-
     const upload = http.expectOne({ method: 'POST', url: '/api/v1/imports' });
     expect((upload.request.body as FormData).get('file')).toEqual(file);
+    expect(upload.request.reportProgress).toBe(true);
+    expect(progress()).toEqual({ heading: 'Uploading employees.csv', shown: '0 %' });
+
+    // When
+    upload.event({ type: HttpEventType.UploadProgress, loaded: 1, total: 3 });
+    await settle();
+
+    // Then
+    expect(progress()).toEqual({ heading: 'Uploading employees.csv', shown: '33 %' });
+
+    // When
+    upload.event({ type: HttpEventType.UploadProgress, loaded: 3, total: 3 });
+    await settle();
+
+    // Then
+    expect(progress()).toBeUndefined();
+    expect(view().textContent).toContain('Importing employees.csv…');
 
     // When
     upload.flush(partialImport);

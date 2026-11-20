@@ -37,15 +37,5 @@ module.exports = defineConfig([
   {
     files: ['**/*.html'],
     extends: [angular.configs.templateRecommended, angular.configs.templateAccessibility],
-    rules: {
-      // Element's account item renders its own accessible label from the
-      // `name` input, so the host button is intentionally empty. Allowlisting
-      // the selector keeps that label instead of overriding it with a
-      // redundant, untranslated aria-label.
-      '@angular-eslint/template/elements-content': [
-        'error',
-        { allowList: ['si-header-account-item'] },
-      ],
-    },
   },
 ]);

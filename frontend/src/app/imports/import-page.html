@@ -11,11 +11,23 @@
 </p>
 
 <section class="mb-8">
-  @if (uploading(); as fileName) {
-    <div class="d-flex align-items-center gap-4 py-8 justify-content-center" role="status">
-      <si-loading-spinner />
-      <span>Importing {{ fileName }}…</span>
-    </div>
+  @if (uploading(); as upload) {
+    @if (upload.sent < upload.size) {
+      <div class="py-8" role="status">
+        <si-progressbar
+          ariaLabel="Upload progress"
+          [heading]="'Uploading ' + upload.name"
+          [value]="percent()"
+          [progress]="percent() + ' %'"
+        />
+      </div>
+    } @else {
+      <!-- Uploaded: the server reads and saves the rows, which it reports no progress for. -->
+      <div class="d-flex align-items-center gap-4 py-8 justify-content-center" role="status">
+        <si-loading-spinner />
+        <span>Importing {{ upload.name }}…</span>
+      </div>
+    }
   } @else {
     <si-file-dropzone
       accept=".csv,text/csv"
